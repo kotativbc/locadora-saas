@@ -19,6 +19,21 @@ export function Layout() {
               Minha empresa
             </NavLink>
           )}
+          {hasPermission('fleet.manage') && (
+            <NavLink to="/frota" className={({ isActive }) => `sidebar__link${isActive ? ' active' : ''}`}>
+              Frota
+            </NavLink>
+          )}
+          {hasPermission('customers.manage') && (
+            <NavLink to="/clientes" className={({ isActive }) => `sidebar__link${isActive ? ' active' : ''}`}>
+              Clientes
+            </NavLink>
+          )}
+          {hasPermission('rates.manage') && (
+            <NavLink to="/tarifas" className={({ isActive }) => `sidebar__link${isActive ? ' active' : ''}`}>
+              Tarifas
+            </NavLink>
+          )}
           {hasPermission('users.manage') && (
             <NavLink to="/usuarios" className={({ isActive }) => `sidebar__link${isActive ? ' active' : ''}`}>
               Usuários

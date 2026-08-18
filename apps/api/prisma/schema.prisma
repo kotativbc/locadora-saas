@@ -20,6 +20,10 @@ model Company {
 
   users     User[]
   auditLogs AuditLog[]
+  vehicles  Vehicle[]
+  customers Customer[]
+  documents Document[]
+  ratePlans RatePlan[]
 
   @@map("companies")
 }
@@ -137,4 +141,106 @@ model Job {
 
   @@index([status, runAfter])
   @@map("jobs")
+}
+
+/// Veículo da frota de uma empresa.
+model Vehicle {
+  id              String   @id @default(uuid())
+  companyId       String
+  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  plate           String
+  renavam         String?
+  chassis         String?
+  brand           String
+  model           String
+  modelYear       Int?
+  manufactureYear Int?
+  color           String?
+  category        String // texto livre por enquanto: economico, sedan, suv, van, luxo...
+  status          String   @default("available") // available | rented | maintenance | inactive
+  odometerKm      Int      @default(0)
+  fuelType        String? // flex, gasolina, diesel, eletrico, hibrido
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  documents Document[]
+  ratePlans RatePlan[]
+
+  @@unique([companyId, plate])
+  @@index([companyId])
+  @@map("vehicles")
+}
+
+/// Cliente (locatário) de uma empresa — não é um usuário do sistema, não faz login.
+model Customer {
+  id                     String    @id @default(uuid())
+  companyId              String
+  company                Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name                   String
+  document               String // CPF ou CNPJ
+  documentType           String    @default("CPF") // CPF | CNPJ
+  email                  String?
+  phone                  String?
+  birthDate              DateTime?
+  address                String?
+  driverLicenseNumber    String?
+  driverLicenseCategory  String?
+  driverLicenseExpiry    DateTime?
+  notes                  String?
+  active                 Boolean   @default(true)
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  documents Document[]
+
+  @@unique([companyId, document])
+  @@index([companyId])
+  @@map("customers")
+}
+
+/// Documento privado anexado a um cliente ou veículo (CNH, CRLV, RG etc.).
+/// Nunca servido estaticamente — sempre lido e transmitido pela API após checar permissão.
+model Document {
+  id               String    @id @default(uuid())
+  companyId        String
+  company          Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  ownerType        String // CUSTOMER | VEHICLE
+  customerId       String?
+  customer         Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  vehicleId        String?
+  vehicle          Vehicle?  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  label            String // ex: "CNH frente", "CRLV", "RG"
+  filePath         String // relativo à raiz de uploads privados
+  mimeType         String
+  sizeBytes        Int
+  uploadedByUserId String?
+  createdAt        DateTime  @default(now())
+
+  @@index([companyId])
+  @@index([customerId])
+  @@index([vehicleId])
+  @@map("documents")
+}
+
+/// Plano de tarifa — por categoria de veículo ou específico de um veículo.
+model RatePlan {
+  id                String   @id @default(uuid())
+  companyId         String
+  company           Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name              String
+  category          String? // aplica a uma categoria de veículo (se vehicleId for nulo)
+  vehicleId         String? // ou é específico de um veículo
+  vehicle           Vehicle? @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  dailyRate         Decimal  @db.Decimal(10, 2)
+  weeklyRate        Decimal? @db.Decimal(10, 2)
+  monthlyRate       Decimal? @db.Decimal(10, 2)
+  kmAllowancePerDay Int?
+  extraKmRate       Decimal? @db.Decimal(10, 2)
+  active            Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([companyId])
+  @@map("rate_plans")
 }

@@ -7,6 +7,10 @@ import { RbacModule } from './rbac/rbac.module';
 import { CompaniesModule } from './companies/companies.module';
 import { UsersModule } from './users/users.module';
 import { CommonModule } from './common/common.module';
+import { DocumentsModule } from './documents/documents.module';
+import { VehiclesModule } from './vehicles/vehicles.module';
+import { CustomersModule } from './customers/customers.module';
+import { RatePlansModule } from './rate-plans/rate-plans.module';
 import { HealthController } from './common/health.controller';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { PermissionsGuard } from './rbac/permissions.guard';
@@ -16,10 +20,14 @@ import { PermissionsGuard } from './rbac/permissions.guard';
     ConfigModule.forRoot({ isGlobal: true }),
     CommonModule,
     PrismaModule,
+    DocumentsModule,
     AuthModule,
     RbacModule,
     CompaniesModule,
     UsersModule,
+    VehiclesModule,
+    CustomersModule,
+    RatePlansModule,
   ],
   controllers: [HealthController],
   providers: [

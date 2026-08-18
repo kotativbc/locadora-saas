@@ -12,3 +12,7 @@ export const UPLOADS_ROOT = path.join(DATA_ROOT, 'uploads');
 export function companyLogoDir(companyId: string): string {
   return path.join(UPLOADS_ROOT, 'companies', companyId);
 }
+
+export function ownerDocumentsDir(companyId: string, ownerType: 'customers' | 'vehicles', ownerId: string): string {
+  return path.join(UPLOADS_ROOT, companyId, ownerType, ownerId);
+}

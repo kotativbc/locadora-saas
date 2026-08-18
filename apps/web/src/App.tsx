@@ -7,6 +7,9 @@ import { Home } from './pages/Home';
 import { Companies } from './pages/Companies';
 import { MyCompany } from './pages/MyCompany';
 import { Users } from './pages/Users';
+import { Fleet } from './pages/Fleet';
+import { Customers } from './pages/Customers';
+import { Rates } from './pages/Rates';
 
 export function App() {
   return (
@@ -20,6 +23,9 @@ export function App() {
               <Route path="/empresas" element={<Companies />} />
               <Route path="/minha-empresa" element={<MyCompany />} />
               <Route path="/usuarios" element={<Users />} />
+              <Route path="/frota" element={<Fleet />} />
+              <Route path="/clientes" element={<Customers />} />
+              <Route path="/tarifas" element={<Rates />} />
             </Route>
           </Route>
         </Routes>
