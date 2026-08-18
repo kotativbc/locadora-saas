@@ -36,6 +36,27 @@ async function tryRefresh(): Promise<boolean> {
   return true;
 }
 
+/**
+ * Faz a mesma dança de auth/refresh do apiRequest, mas devolve a Response crua
+ * em vez de parsear como JSON — usado para arquivos binários (imagens, PDFs).
+ * Necessário porque o token de acesso vive só em memória e vai no header
+ * Authorization: uma tag <img>/<a> comum não consegue mandar esse header,
+ * então qualquer arquivo autenticado precisa passar por aqui.
+ */
+async function rawFileRequest(path: string): Promise<Response> {
+  let res = await rawRequest(path);
+  if (res.status === 401) {
+    const refreshed = await tryRefresh();
+    if (refreshed) {
+      res = await rawRequest(path);
+    }
+  }
+  if (!res.ok) {
+    throw new ApiError(res.status, 'Não foi possível carregar o arquivo.');
+  }
+  return res;
+}
+
 export async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
   let res = await rawRequest(path, init);
 
@@ -55,6 +76,13 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}): Promi
     return undefined as T;
   }
   return res.json() as Promise<T>;
+}
+
+/** Busca um arquivo autenticado e devolve uma object URL (pra <img src> ou window.open). */
+export async function fetchFileUrl(path: string): Promise<string> {
+  const res = await rawFileRequest(path);
+  const blob = await res.blob();
+  return URL.createObjectURL(blob);
 }
 
 export const api = {

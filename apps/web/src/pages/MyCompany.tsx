@@ -1,5 +1,5 @@
 import { useEffect, useState, type ChangeEvent } from 'react';
-import { api, ApiError } from '../api';
+import { api, ApiError, fetchFileUrl } from '../api';
 import { useAuth } from '../auth/AuthContext';
 
 interface Company {
@@ -14,12 +14,19 @@ interface Company {
 export function MyCompany() {
   const { hasPermission } = useAuth();
   const [company, setCompany] = useState<Company | null>(null);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
 
   async function load() {
     try {
-      setCompany(await api.get<Company>('/companies/me'));
+      const data = await api.get<Company>('/companies/me');
+      setCompany(data);
+      if (data.logoPath) {
+        setLogoUrl(await fetchFileUrl(`/companies/${data.id}/logo`));
+      } else {
+        setLogoUrl(null);
+      }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Erro ao carregar dados da empresa.');
     }
@@ -27,6 +34,11 @@ export function MyCompany() {
 
   useEffect(() => {
     load();
+    // A object URL do logo é revogada quando o componente desmonta, pra não vazar memória.
+    return () => {
+      if (logoUrl) URL.revokeObjectURL(logoUrl);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function handleLogoChange(e: ChangeEvent<HTMLInputElement>) {
@@ -82,9 +94,9 @@ export function MyCompany() {
             flexShrink: 0,
           }}
         >
-          {company.logoPath ? (
+          {logoUrl ? (
             <img
-              src={`/api/companies/${company.id}/logo`}
+              src={logoUrl}
               alt="Logo da empresa"
               style={{ width: '100%', height: '100%', objectFit: 'contain' }}
             />

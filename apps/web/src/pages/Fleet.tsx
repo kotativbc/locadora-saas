@@ -24,6 +24,7 @@ export function Fleet() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
+  const [savingId, setSavingId] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
@@ -40,6 +41,19 @@ export function Fleet() {
     load();
   }, []);
 
+  async function handleStatusChange(vehicleId: string, status: string) {
+    setSavingId(vehicleId);
+    setError(null);
+    try {
+      await api.patch(`/vehicles/${vehicleId}`, { status });
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erro ao atualizar status.');
+    } finally {
+      setSavingId(null);
+    }
+  }
+
   return (
     <div>
       <div className="page-header">
@@ -48,6 +62,11 @@ export function Fleet() {
       </div>
 
       {error && <div className="error-banner">{error}</div>}
+      <p style={{ fontSize: 13, color: 'var(--ink-muted)', marginTop: -8 }}>
+        O status aqui só controla se o veículo está disponível pra locação em geral (manutenção/inativo tiram ele de
+        circulação por completo). Se um veículo específico está livre numa data, isso é decidido pela agenda de
+        contratos — não precisa marcar "Locado" manualmente.
+      </p>
 
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
@@ -80,7 +99,20 @@ export function Fleet() {
                     {v.brand} {v.model}
                   </td>
                   <td>{v.category}</td>
-                  <td>{STATUS_LABELS[v.status] ?? v.status}</td>
+                  <td>
+                    <select
+                      value={v.status}
+                      disabled={savingId === v.id}
+                      onChange={(e) => handleStatusChange(v.id, e.target.value)}
+                      style={{ padding: '4px 6px', borderRadius: 6, border: '1px solid var(--border)' }}
+                    >
+                      {Object.entries(STATUS_LABELS).map(([code, label]) => (
+                        <option key={code} value={code}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
                   <td>{v.odometerKm.toLocaleString('pt-BR')} km</td>
                 </tr>
               ))}

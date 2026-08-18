@@ -29,6 +29,11 @@ export function Layout() {
               Clientes
             </NavLink>
           )}
+          {hasPermission('contracts.manage') && (
+            <NavLink to="/contratos" className={({ isActive }) => `sidebar__link${isActive ? ' active' : ''}`}>
+              Contratos
+            </NavLink>
+          )}
           {hasPermission('rates.manage') && (
             <NavLink to="/tarifas" className={({ isActive }) => `sidebar__link${isActive ? ' active' : ''}`}>
               Tarifas
