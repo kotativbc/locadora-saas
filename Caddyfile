@@ -1,0 +1,22 @@
+# Modo atual: acesso só por IP (sem domínio apontado ainda), sem HTTPS automático.
+# Quando o DNS de soucore.com.br estiver apontado pro servidor, troque a linha
+# ":80 {" abaixo por, por exemplo, "app.soucore.com.br {" e remova a linha
+# "auto_https off" — o Caddy emite e renova o certificado Let's Encrypt sozinho.
+
+{
+	auto_https off
+}
+
+:80 {
+	encode gzip
+
+	handle /api/* {
+		reverse_proxy api:3000
+	}
+
+	handle {
+		root * /srv/web
+		try_files {path} /index.html
+		file_server
+	}
+}

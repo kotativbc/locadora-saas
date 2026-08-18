@@ -1,0 +1,9 @@
+[Unit]
+Description=Backup do rental-saas (Postgres + uploads)
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/srv/rental-app
+ExecStart=/srv/rental-app/scripts/backup.sh

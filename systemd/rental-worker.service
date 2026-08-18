@@ -1,0 +1,9 @@
+[Unit]
+Description=Processa a fila de jobs do rental-saas (um lote por execução)
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/srv/rental-app
+ExecStart=/usr/bin/docker compose run --rm --no-deps api node dist/worker.js

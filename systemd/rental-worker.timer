@@ -1,0 +1,10 @@
+[Unit]
+Description=Roda o worker de jobs do rental-saas a cada minuto
+
+[Timer]
+OnBootSec=30
+OnUnitActiveSec=60
+Persistent=false
+
+[Install]
+WantedBy=timers.target

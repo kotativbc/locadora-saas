@@ -1,0 +1,139 @@
+import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import * as argon2 from 'argon2';
+import * as fs from 'fs/promises';
+import * as path from 'path';
+import { PrismaService } from '../prisma/prisma.service';
+import { AuditLogService } from '../common/audit-log.service';
+import { CreateCompanyDto } from './dto/create-company.dto';
+import { UpdateCompanyDto } from './dto/update-company.dto';
+import { RoleCode } from '../rbac/rbac.constants';
+import { companyLogoDir } from '../common/storage';
+import { RequestUser } from '../auth/types';
+
+@Injectable()
+export class CompaniesService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditLog: AuditLogService,
+  ) {}
+
+  /** Somente Super Admin: cria a empresa e já cria o primeiro usuário Admin dela. */
+  async create(dto: CreateCompanyDto, actor: RequestUser) {
+    const emailInUse = await this.prisma.user.findUnique({ where: { email: dto.adminEmail } });
+    if (emailInUse) {
+      throw new ConflictException('Já existe um usuário com este e-mail.');
+    }
+    if (dto.cnpj) {
+      const cnpjInUse = await this.prisma.company.findUnique({ where: { cnpj: dto.cnpj } });
+      if (cnpjInUse) {
+        throw new ConflictException('Já existe uma empresa cadastrada com este CNPJ.');
+      }
+    }
+
+    const companyAdminRole = await this.prisma.role.findUniqueOrThrow({
+      where: { code: RoleCode.COMPANY_ADMIN },
+    });
+    const passwordHash = await argon2.hash(dto.adminPassword);
+
+    const company = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.company.create({
+        data: { name: dto.name, tradeName: dto.tradeName, cnpj: dto.cnpj },
+      });
+
+      await tx.user.create({
+        data: {
+          companyId: created.id,
+          name: dto.adminName,
+          email: dto.adminEmail,
+          passwordHash,
+          roles: { create: { roleId: companyAdminRole.id } },
+        },
+      });
+
+      return created;
+    });
+
+    await this.auditLog.record({
+      action: 'company.create',
+      userId: actor.id,
+      companyId: company.id,
+      entityType: 'Company',
+      entityId: company.id,
+    });
+
+    return company;
+  }
+
+  /** Somente Super Admin. */
+  async findAll() {
+    return this.prisma.company.findMany({ orderBy: { createdAt: 'desc' } });
+  }
+
+  async findOne(id: string, actor: RequestUser) {
+    this.assertCanAccess(id, actor);
+    const company = await this.prisma.company.findUnique({ where: { id } });
+    if (!company) {
+      throw new NotFoundException('Empresa não encontrada.');
+    }
+    return company;
+  }
+
+  async update(id: string, dto: UpdateCompanyDto, actor: RequestUser) {
+    this.assertCanAccess(id, actor);
+    const company = await this.prisma.company.update({ where: { id }, data: dto });
+
+    await this.auditLog.record({
+      action: 'company.update',
+      userId: actor.id,
+      companyId: id,
+      entityType: 'Company',
+      entityId: id,
+      metadata: dto as Record<string, unknown>,
+    });
+
+    return company;
+  }
+
+  async saveLogo(id: string, file: Express.Multer.File, actor: RequestUser) {
+    this.assertCanAccess(id, actor);
+
+    const dir = companyLogoDir(id);
+    await fs.mkdir(dir, { recursive: true });
+
+    const ext = path.extname(file.originalname) || '.png';
+    const filename = `logo${ext}`;
+    const destination = path.join(dir, filename);
+    await fs.writeFile(destination, file.buffer);
+
+    const relativePath = path.join('companies', id, filename);
+    await this.prisma.company.update({ where: { id }, data: { logoPath: relativePath } });
+
+    await this.auditLog.record({
+      action: 'company.logo_upload',
+      userId: actor.id,
+      companyId: id,
+      entityType: 'Company',
+      entityId: id,
+    });
+
+    return { logoPath: relativePath };
+  }
+
+  async readLogo(id: string, actor: RequestUser): Promise<{ absolutePath: string; filename: string }> {
+    this.assertCanAccess(id, actor);
+    const company = await this.prisma.company.findUnique({ where: { id } });
+    if (!company?.logoPath) {
+      throw new NotFoundException('Esta empresa ainda não tem logo cadastrada.');
+    }
+    const { UPLOADS_ROOT } = await import('../common/storage');
+    return { absolutePath: path.join(UPLOADS_ROOT, company.logoPath), filename: path.basename(company.logoPath) };
+  }
+
+  /** Super Admin acessa qualquer empresa; os demais só a própria. */
+  private assertCanAccess(companyId: string, actor: RequestUser) {
+    const isSuperAdmin = actor.roles.includes(RoleCode.SUPER_ADMIN);
+    if (!isSuperAdmin && actor.companyId !== companyId) {
+      throw new ForbiddenException('Você não tem acesso a esta empresa.');
+    }
+  }
+}
