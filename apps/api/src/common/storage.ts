@@ -15,7 +15,7 @@ export function companyLogoDir(companyId: string): string {
 
 export function ownerDocumentsDir(
   companyId: string,
-  ownerType: 'customers' | 'vehicles' | 'inspections',
+  ownerType: 'customers' | 'vehicles' | 'inspections' | 'claims',
   ownerId: string,
 ): string {
   return path.join(UPLOADS_ROOT, companyId, ownerType, ownerId);

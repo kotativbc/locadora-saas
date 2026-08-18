@@ -1,0 +1,222 @@
+import { useEffect, useState, type FormEvent } from 'react';
+import { api, ApiError } from '../api';
+
+interface Vehicle {
+  id: string;
+  plate: string;
+  brand: string;
+  model: string;
+}
+
+interface Fine {
+  id: string;
+  infractionDate: string;
+  amount: string;
+  description: string;
+  status: string;
+  chargeToCustomer: boolean;
+  vehicle: { plate: string; brand: string; model: string };
+}
+
+const STATUS_LABELS: Record<string, string> = {
+  pending: 'Pendente',
+  paid: 'Paga',
+  contested: 'Contestada',
+};
+
+function formatCurrency(value: string) {
+  return Number(value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+export function Fines() {
+  const [fines, setFines] = useState<Fine[]>([]);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [formOpen, setFormOpen] = useState(false);
+  const [savingId, setSavingId] = useState<string | null>(null);
+
+  async function load() {
+    setLoading(true);
+    try {
+      const [f, v] = await Promise.all([api.get<Fine[]>('/fines'), api.get<Vehicle[]>('/vehicles')]);
+      setFines(f);
+      setVehicles(v);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erro ao carregar multas.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  async function handleStatusChange(id: string, status: string) {
+    setSavingId(id);
+    try {
+      await api.patch(`/fines/${id}`, { status });
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erro ao atualizar multa.');
+    } finally {
+      setSavingId(null);
+    }
+  }
+
+  return (
+    <div>
+      <div className="page-header">
+        <h1>Multas</h1>
+        <div className="page-header__rule" />
+      </div>
+
+      {error && <div className="error-banner">{error}</div>}
+
+      <div className="card">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <strong>{fines.length} multa(s)</strong>
+          <button className="btn btn--accent" onClick={() => setFormOpen((v) => !v)}>
+            {formOpen ? 'Cancelar' : '+ Nova multa'}
+          </button>
+        </div>
+
+        {loading ? (
+          <p>Carregando...</p>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>Veículo</th>
+                <th>Data da infração</th>
+                <th>Descrição</th>
+                <th>Valor</th>
+                <th>Cobrar do cliente</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {fines.map((f) => (
+                <tr key={f.id}>
+                  <td>
+                    <span className="plate">{f.vehicle.plate}</span> {f.vehicle.brand} {f.vehicle.model}
+                  </td>
+                  <td>{new Date(f.infractionDate).toLocaleDateString('pt-BR')}</td>
+                  <td>{f.description}</td>
+                  <td>{formatCurrency(f.amount)}</td>
+                  <td>{f.chargeToCustomer ? 'Sim' : 'Não'}</td>
+                  <td>
+                    <select
+                      value={f.status}
+                      disabled={savingId === f.id}
+                      onChange={(e) => handleStatusChange(f.id, e.target.value)}
+                      style={{ padding: '4px 6px', borderRadius: 6, border: '1px solid var(--border)' }}
+                    >
+                      {Object.entries(STATUS_LABELS).map(([code, label]) => (
+                        <option key={code} value={code}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {formOpen && <NewFineForm vehicles={vehicles} onCreated={() => { setFormOpen(false); load(); }} />}
+    </div>
+  );
+}
+
+function NewFineForm({ vehicles, onCreated }: { vehicles: Vehicle[]; onCreated: () => void }) {
+  const [vehicleId, setVehicleId] = useState(vehicles[0]?.id ?? '');
+  const [infractionDate, setInfractionDate] = useState('');
+  const [dueDate, setDueDate] = useState('');
+  const [amount, setAmount] = useState('');
+  const [description, setDescription] = useState('');
+  const [documentNumber, setDocumentNumber] = useState('');
+  const [chargeToCustomer, setChargeToCustomer] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    try {
+      await api.post('/fines', {
+        vehicleId,
+        infractionDate: new Date(infractionDate).toISOString(),
+        dueDate: dueDate ? new Date(dueDate).toISOString() : undefined,
+        amount,
+        description,
+        documentNumber: documentNumber || undefined,
+        chargeToCustomer,
+      });
+      onCreated();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erro ao registrar multa.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (vehicles.length === 0) {
+    return (
+      <div className="card">
+        <p style={{ margin: 0 }}>Cadastre pelo menos um veículo antes de registrar uma multa.</p>
+      </div>
+    );
+  }
+
+  return (
+    <form className="card" onSubmit={handleSubmit}>
+      <h3 style={{ marginTop: 0 }}>Nova multa</h3>
+      {error && <div className="error-banner">{error}</div>}
+      <div className="field">
+        <label>Veículo</label>
+        <select value={vehicleId} onChange={(e) => setVehicleId(e.target.value)}>
+          {vehicles.map((v) => (
+            <option key={v.id} value={v.id}>
+              {v.plate} — {v.brand} {v.model}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="field">
+        <label>Data da infração</label>
+        <input required type="date" value={infractionDate} onChange={(e) => setInfractionDate(e.target.value)} />
+      </div>
+      <div className="field">
+        <label>Vencimento (opcional)</label>
+        <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+      </div>
+      <div className="field">
+        <label>Valor (R$)</label>
+        <input required type="number" step="0.01" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} />
+      </div>
+      <div className="field">
+        <label>Descrição da infração</label>
+        <input required value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Ex: excesso de velocidade" />
+      </div>
+      <div className="field">
+        <label>Nº do AIT/notificação (opcional)</label>
+        <input value={documentNumber} onChange={(e) => setDocumentNumber(e.target.value)} />
+      </div>
+      <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, marginBottom: 4 }}>
+        <input type="checkbox" checked={chargeToCustomer} onChange={(e) => setChargeToCustomer(e.target.checked)} />
+        Cobrar do cliente
+      </label>
+      <p style={{ fontSize: 12, color: 'var(--ink-muted)', marginTop: 0, marginBottom: 14 }}>
+        Marca a intenção — o lançamento financeiro em si vem na Fase 5.
+      </p>
+      <button className="btn" type="submit" disabled={submitting}>
+        {submitting ? 'Salvando...' : 'Registrar multa'}
+      </button>
+    </form>
+  );
+}

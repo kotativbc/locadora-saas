@@ -10,12 +10,20 @@ import { RequestUser } from '../auth/types';
 const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024; // 10MB
 const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'application/pdf']);
 
-export type DocumentOwnerType = 'CUSTOMER' | 'VEHICLE' | 'INSPECTION';
+export type DocumentOwnerType = 'CUSTOMER' | 'VEHICLE' | 'INSPECTION' | 'CLAIM';
 
-const DIR_KIND: Record<DocumentOwnerType, 'customers' | 'vehicles' | 'inspections'> = {
+const DIR_KIND: Record<DocumentOwnerType, 'customers' | 'vehicles' | 'inspections' | 'claims'> = {
   CUSTOMER: 'customers',
   VEHICLE: 'vehicles',
   INSPECTION: 'inspections',
+  CLAIM: 'claims',
+};
+
+const ENTITY_TYPE: Record<DocumentOwnerType, string> = {
+  CUSTOMER: 'Customer',
+  VEHICLE: 'Vehicle',
+  INSPECTION: 'Inspection',
+  CLAIM: 'Claim',
 };
 
 @Injectable()
@@ -59,6 +67,7 @@ export class DocumentsService {
         customerId: ownerType === 'CUSTOMER' ? ownerId : undefined,
         vehicleId: ownerType === 'VEHICLE' ? ownerId : undefined,
         inspectionId: ownerType === 'INSPECTION' ? ownerId : undefined,
+        claimId: ownerType === 'CLAIM' ? ownerId : undefined,
         label,
         filePath: relativePath,
         mimeType: file.mimetype,
@@ -71,7 +80,7 @@ export class DocumentsService {
       action: 'document.upload',
       userId: actor.id,
       companyId: actor.companyId,
-      entityType: ownerType === 'CUSTOMER' ? 'Customer' : ownerType === 'VEHICLE' ? 'Vehicle' : 'Inspection',
+      entityType: ENTITY_TYPE[ownerType],
       entityId: ownerId,
       metadata: { documentId: doc.id, label },
     });
@@ -81,14 +90,15 @@ export class DocumentsService {
 
   async listFor(ownerType: DocumentOwnerType, ownerId: string, actor: RequestUser) {
     if (!actor.companyId) return [];
-    const ownerFilter =
-      ownerType === 'CUSTOMER'
-        ? { customerId: ownerId }
-        : ownerType === 'VEHICLE'
-          ? { vehicleId: ownerId }
-          : { inspectionId: ownerId };
     return this.prisma.document.findMany({
-      where: { companyId: actor.companyId, ownerType, ...ownerFilter },
+      where: {
+        companyId: actor.companyId,
+        ownerType,
+        customerId: ownerType === 'CUSTOMER' ? ownerId : undefined,
+        vehicleId: ownerType === 'VEHICLE' ? ownerId : undefined,
+        inspectionId: ownerType === 'INSPECTION' ? ownerId : undefined,
+        claimId: ownerType === 'CLAIM' ? ownerId : undefined,
+      },
       orderBy: { createdAt: 'desc' },
     });
   }

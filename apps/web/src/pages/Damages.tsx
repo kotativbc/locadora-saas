@@ -200,10 +200,14 @@ function NewDamageForm({ vehicles, onCreated }: { vehicles: Vehicle[]; onCreated
         <label>Custo estimado (R$, opcional)</label>
         <input type="number" step="0.01" min="0" value={estimatedCost} onChange={(e) => setEstimatedCost(e.target.value)} />
       </div>
-      <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, marginBottom: 14 }}>
+      <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, marginBottom: 4 }}>
         <input type="checkbox" checked={chargeToCustomer} onChange={(e) => setChargeToCustomer(e.target.checked)} />
         Cobrar do cliente
       </label>
+      <p style={{ fontSize: 12, color: 'var(--ink-muted)', marginTop: 0, marginBottom: 14 }}>
+        Por enquanto isso só marca a intenção de cobrança — ainda não existe módulo
+        financeiro pra gerar a cobrança de verdade (vem na Fase 5).
+      </p>
       <button className="btn" type="submit" disabled={submitting}>
         {submitting ? 'Salvando...' : 'Registrar avaria'}
       </button>

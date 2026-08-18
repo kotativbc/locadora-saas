@@ -44,6 +44,21 @@ export function Layout() {
               Avarias
             </NavLink>
           )}
+          {hasPermission('contracts.manage') && (
+            <NavLink to="/sinistros" className={({ isActive }) => `sidebar__link${isActive ? ' active' : ''}`}>
+              Sinistros
+            </NavLink>
+          )}
+          {hasPermission('contracts.manage') && (
+            <NavLink to="/multas" className={({ isActive }) => `sidebar__link${isActive ? ' active' : ''}`}>
+              Multas
+            </NavLink>
+          )}
+          {hasPermission('fleet.manage') && (
+            <NavLink to="/rastreamento" className={({ isActive }) => `sidebar__link${isActive ? ' active' : ''}`}>
+              Rastreamento
+            </NavLink>
+          )}
           {hasPermission('rates.manage') && (
             <NavLink to="/tarifas" className={({ isActive }) => `sidebar__link${isActive ? ' active' : ''}`}>
               Tarifas

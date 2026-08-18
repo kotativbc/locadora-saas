@@ -28,6 +28,9 @@ model Company {
   inspections   Inspection[]
   damages       Damage[]
   maintenances  Maintenance[]
+  claims        Claim[]
+  fines         Fine[]
+  vehiclePositions VehiclePosition[]
 
   @@map("companies")
 }
@@ -174,6 +177,9 @@ model Vehicle {
   inspections Inspection[]
   damages     Damage[]
   maintenances Maintenance[]
+  claims      Claim[]
+  fines       Fine[]
+  positions   VehiclePosition[]
 
   @@unique([companyId, plate])
   @@index([companyId])
@@ -214,13 +220,15 @@ model Document {
   id               String      @id @default(uuid())
   companyId        String
   company          Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  ownerType        String // CUSTOMER | VEHICLE | INSPECTION
+  ownerType        String // CUSTOMER | VEHICLE | INSPECTION | CLAIM
   customerId       String?
   customer         Customer?   @relation(fields: [customerId], references: [id], onDelete: Cascade)
   vehicleId        String?
   vehicle          Vehicle?    @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
   inspectionId     String?
   inspection       Inspection? @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+  claimId          String?
+  claim            Claim?      @relation(fields: [claimId], references: [id], onDelete: Cascade)
   label            String // ex: "CNH frente", "CRLV", "Foto lateral direita"
   filePath         String // relativo à raiz de uploads privados
   mimeType         String
@@ -232,6 +240,7 @@ model Document {
   @@index([customerId])
   @@index([vehicleId])
   @@index([inspectionId])
+  @@index([claimId])
   @@map("documents")
 }
 
@@ -284,6 +293,8 @@ model Contract {
   signature   ContractSignature?
   inspections Inspection[]
   damages     Damage[]
+  claims      Claim[]
+  fines       Fine[]
 
   @@index([companyId])
   @@index([customerId])
@@ -382,4 +393,80 @@ model Maintenance {
   @@index([companyId])
   @@index([vehicleId])
   @@map("maintenances")
+}
+
+/// Sinistro (acidente, roubo/furto, incêndio etc.) envolvendo um veículo.
+model Claim {
+  id                    String    @id @default(uuid())
+  companyId             String
+  company               Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  vehicleId             String
+  vehicle               Vehicle   @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  contractId            String?
+  contract              Contract? @relation(fields: [contractId], references: [id], onDelete: SetNull)
+  type                  String // accident | theft | fire | other
+  occurredAt            DateTime
+  location              String?
+  description           String
+  policeReportNumber    String? // número do B.O.
+  thirdPartyInvolved    Boolean   @default(false)
+  thirdPartyDescription String?
+  insuranceClaimNumber  String?
+  estimatedCost         Decimal?  @db.Decimal(10, 2)
+  status                String    @default("open") // open | in_progress | resolved | closed
+  createdByUserId       String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  photos Document[]
+
+  @@index([companyId])
+  @@index([vehicleId])
+  @@map("claims")
+}
+
+/// Multa de trânsito — cadastro manual, sem integração com órgãos oficiais.
+model Fine {
+  id               String    @id @default(uuid())
+  companyId        String
+  company          Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  vehicleId        String
+  vehicle          Vehicle   @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  contractId       String?
+  contract         Contract? @relation(fields: [contractId], references: [id], onDelete: SetNull)
+  infractionDate   DateTime
+  dueDate          DateTime?
+  amount           Decimal   @db.Decimal(10, 2)
+  description      String // descrição da infração
+  documentNumber   String? // número do AIT/notificação
+  status           String    @default("pending") // pending | paid | contested
+  chargeToCustomer Boolean   @default(false)
+  createdByUserId  String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([companyId])
+  @@index([vehicleId])
+  @@map("fines")
+}
+
+/// Posição de rastreamento de um veículo. "source" identifica o adapter que
+/// gerou o registro — hoje só "manual" existe; adapters de rastreadores reais
+/// podem escrever aqui no futuro sem mudar nada no resto do sistema.
+model VehiclePosition {
+  id               String   @id @default(uuid())
+  companyId        String
+  company          Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  vehicleId        String
+  vehicle          Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  latitude         Decimal? @db.Decimal(9, 6)
+  longitude        Decimal? @db.Decimal(9, 6)
+  locationText     String? // descrição livre, útil sem coordenadas (ex: "Pátio da matriz")
+  source           String   @default("manual")
+  recordedAt       DateTime @default(now())
+  recordedByUserId String?
+
+  @@index([companyId])
+  @@index([vehicleId])
+  @@map("vehicle_positions")
 }

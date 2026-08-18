@@ -14,6 +14,9 @@ import { Contracts } from './pages/Contracts';
 import { PublicSign } from './pages/PublicSign';
 import { Maintenance } from './pages/Maintenance';
 import { Damages } from './pages/Damages';
+import { Claims } from './pages/Claims';
+import { Fines } from './pages/Fines';
+import { Tracking } from './pages/Tracking';
 
 export function App() {
   return (
@@ -34,6 +37,9 @@ export function App() {
               <Route path="/contratos" element={<Contracts />} />
               <Route path="/manutencao" element={<Maintenance />} />
               <Route path="/avarias" element={<Damages />} />
+              <Route path="/sinistros" element={<Claims />} />
+              <Route path="/multas" element={<Fines />} />
+              <Route path="/rastreamento" element={<Tracking />} />
             </Route>
           </Route>
         </Routes>

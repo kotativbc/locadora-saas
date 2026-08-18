@@ -16,6 +16,9 @@ import { PublicSignaturesModule } from './public-signatures/public-signatures.mo
 import { InspectionsModule } from './inspections/inspections.module';
 import { DamagesModule } from './damages/damages.module';
 import { MaintenanceModule } from './maintenance/maintenance.module';
+import { ClaimsModule } from './claims/claims.module';
+import { FinesModule } from './fines/fines.module';
+import { TrackingModule } from './tracking/tracking.module';
 import { HealthController } from './common/health.controller';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { PermissionsGuard } from './rbac/permissions.guard';
@@ -38,6 +41,9 @@ import { PermissionsGuard } from './rbac/permissions.guard';
     InspectionsModule,
     DamagesModule,
     MaintenanceModule,
+    ClaimsModule,
+    FinesModule,
+    TrackingModule,
   ],
   controllers: [HealthController],
   providers: [
