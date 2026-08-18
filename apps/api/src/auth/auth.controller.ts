@@ -7,7 +7,12 @@ import { CurrentUser } from './current-user.decorator';
 import { RequestUser } from './types';
 
 const REFRESH_COOKIE = 'refresh_token';
-const isProd = process.env.NODE_ENV === 'production';
+const REFRESH_COOKIE_PATH = '/api/auth';
+// Controlado por env, não por NODE_ENV: em modo IP/sem domínio ainda não há
+// HTTPS, e um cookie "Secure" simplesmente não é enviado pelo navegador numa
+// conexão HTTP — travaria o refresh inteiro. Ligar quando o domínio com TLS
+// estiver ativo (definir COOKIE_SECURE=true no .env).
+const COOKIE_SECURE = process.env.COOKIE_SECURE === 'true';
 
 @Controller('auth')
 export class AuthController {
@@ -39,7 +44,7 @@ export class AuthController {
     if (raw) {
       await this.authService.logout(raw);
     }
-    res.clearCookie(REFRESH_COOKIE);
+    res.clearCookie(REFRESH_COOKIE, { path: REFRESH_COOKIE_PATH, sameSite: 'lax', secure: COOKIE_SECURE });
     return { ok: true };
   }
 
@@ -51,9 +56,9 @@ export class AuthController {
   private setRefreshCookie(res: Response, token: string) {
     res.cookie(REFRESH_COOKIE, token, {
       httpOnly: true,
-      secure: isProd,
+      secure: COOKIE_SECURE,
       sameSite: 'lax',
-      path: '/auth',
+      path: REFRESH_COOKIE_PATH,
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
   }

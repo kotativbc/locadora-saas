@@ -18,9 +18,19 @@ COPY --from=build /app/prisma ./prisma
 COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=build /app/node_modules/@prisma ./node_modules/@prisma
 
-# Usuário não-root dentro do container
-RUN useradd --create-home --shell /bin/bash appuser
-USER appuser
+# Usuário não-root dentro do container — UID/GID recebido como build arg,
+# igual ao do usuário "deploy" no host (ver docker-compose.yml). Isso resolve
+# de vez o problema de permissão em pastas de /srv/rental-data e
+# apps/api/prisma criadas pelo host: dono bate, sem chown manual.
+# Usa UID/GID numérico direto (sem useradd) de propósito: a imagem base já
+# vem com um usuário "node" no UID/GID 1000, que colidiria com o "deploy"
+# do host na maioria dos servidores Debian — o Docker aceita USER numérico
+# sem precisar de entrada em /etc/passwd.
+ARG APP_UID=1000
+ARG APP_GID=1000
+RUN mkdir -p /home/appuser && chown ${APP_UID}:${APP_GID} /home/appuser
+ENV HOME=/home/appuser
+USER ${APP_UID}:${APP_GID}
 
 EXPOSE 3000
 CMD ["node", "dist/main.js"]

@@ -1,14 +1,34 @@
+import { useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 
 export function Layout() {
   const { user, logout, hasPermission } = useAuth();
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
     <div className="app-shell">
-      <aside className="sidebar">
-        <div className="sidebar__brand">Locadora · Plataforma</div>
-        <nav className="sidebar__nav">
+      <header className="mobile-topbar">
+        <button
+          className="mobile-topbar__toggle"
+          aria-label="Abrir menu"
+          onClick={() => setMobileOpen(true)}
+        >
+          ☰
+        </button>
+        <span className="mobile-topbar__brand">Locadora</span>
+      </header>
+
+      {mobileOpen && <div className="sidebar-backdrop" onClick={() => setMobileOpen(false)} />}
+
+      <aside className={`sidebar${mobileOpen ? ' sidebar--open' : ''}`}>
+        <div className="sidebar__brand">
+          Locadora · Plataforma
+          <button className="sidebar__close" aria-label="Fechar menu" onClick={() => setMobileOpen(false)}>
+            ✕
+          </button>
+        </div>
+        <nav className="sidebar__nav" onClick={() => setMobileOpen(false)}>
           {hasPermission('platform.manage') && (
             <NavLink to="/empresas" className={({ isActive }) => `sidebar__link${isActive ? ' active' : ''}`}>
               Empresas

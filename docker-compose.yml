@@ -22,6 +22,9 @@ services:
   api:
     build:
       context: ./apps/api
+      args:
+        APP_UID: ${DEPLOY_UID}
+        APP_GID: ${DEPLOY_GID}
     restart: unless-stopped
     env_file:
       - .env

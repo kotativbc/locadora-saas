@@ -62,7 +62,7 @@ export function PublicSign() {
 
   return (
     <div className="login-screen">
-      <div className="login-card" style={{ width: 420 }}>
+      <div className="login-card" style={{ maxWidth: 420, width: '100%' }}>
         {loading && <p>Carregando contrato...</p>}
 
         {!loading && error && !signed && <div className="error-banner">{error}</div>}
