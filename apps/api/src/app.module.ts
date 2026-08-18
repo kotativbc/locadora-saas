@@ -13,6 +13,9 @@ import { CustomersModule } from './customers/customers.module';
 import { RatePlansModule } from './rate-plans/rate-plans.module';
 import { ContractsModule } from './contracts/contracts.module';
 import { PublicSignaturesModule } from './public-signatures/public-signatures.module';
+import { InspectionsModule } from './inspections/inspections.module';
+import { DamagesModule } from './damages/damages.module';
+import { MaintenanceModule } from './maintenance/maintenance.module';
 import { HealthController } from './common/health.controller';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { PermissionsGuard } from './rbac/permissions.guard';
@@ -32,6 +35,9 @@ import { PermissionsGuard } from './rbac/permissions.guard';
     RatePlansModule,
     ContractsModule,
     PublicSignaturesModule,
+    InspectionsModule,
+    DamagesModule,
+    MaintenanceModule,
   ],
   controllers: [HealthController],
   providers: [

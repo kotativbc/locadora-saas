@@ -12,6 +12,8 @@ import { Customers } from './pages/Customers';
 import { Rates } from './pages/Rates';
 import { Contracts } from './pages/Contracts';
 import { PublicSign } from './pages/PublicSign';
+import { Maintenance } from './pages/Maintenance';
+import { Damages } from './pages/Damages';
 
 export function App() {
   return (
@@ -30,6 +32,8 @@ export function App() {
               <Route path="/clientes" element={<Customers />} />
               <Route path="/tarifas" element={<Rates />} />
               <Route path="/contratos" element={<Contracts />} />
+              <Route path="/manutencao" element={<Maintenance />} />
+              <Route path="/avarias" element={<Damages />} />
             </Route>
           </Route>
         </Routes>

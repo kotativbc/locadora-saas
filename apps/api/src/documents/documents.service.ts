@@ -10,7 +10,13 @@ import { RequestUser } from '../auth/types';
 const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024; // 10MB
 const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'application/pdf']);
 
-export type DocumentOwnerType = 'CUSTOMER' | 'VEHICLE';
+export type DocumentOwnerType = 'CUSTOMER' | 'VEHICLE' | 'INSPECTION';
+
+const DIR_KIND: Record<DocumentOwnerType, 'customers' | 'vehicles' | 'inspections'> = {
+  CUSTOMER: 'customers',
+  VEHICLE: 'vehicles',
+  INSPECTION: 'inspections',
+};
 
 @Injectable()
 export class DocumentsService {
@@ -36,7 +42,7 @@ export class DocumentsService {
       throw new ForbiddenException('Tipo de arquivo não permitido. Envie PDF, JPG, PNG ou WEBP.');
     }
 
-    const dirKind = ownerType === 'CUSTOMER' ? 'customers' : 'vehicles';
+    const dirKind = DIR_KIND[ownerType];
     const dir = ownerDocumentsDir(actor.companyId, dirKind, ownerId);
     await fs.mkdir(dir, { recursive: true });
 
@@ -52,6 +58,7 @@ export class DocumentsService {
         ownerType,
         customerId: ownerType === 'CUSTOMER' ? ownerId : undefined,
         vehicleId: ownerType === 'VEHICLE' ? ownerId : undefined,
+        inspectionId: ownerType === 'INSPECTION' ? ownerId : undefined,
         label,
         filePath: relativePath,
         mimeType: file.mimetype,
@@ -64,7 +71,7 @@ export class DocumentsService {
       action: 'document.upload',
       userId: actor.id,
       companyId: actor.companyId,
-      entityType: ownerType === 'CUSTOMER' ? 'Customer' : 'Vehicle',
+      entityType: ownerType === 'CUSTOMER' ? 'Customer' : ownerType === 'VEHICLE' ? 'Vehicle' : 'Inspection',
       entityId: ownerId,
       metadata: { documentId: doc.id, label },
     });
@@ -74,12 +81,14 @@ export class DocumentsService {
 
   async listFor(ownerType: DocumentOwnerType, ownerId: string, actor: RequestUser) {
     if (!actor.companyId) return [];
+    const ownerFilter =
+      ownerType === 'CUSTOMER'
+        ? { customerId: ownerId }
+        : ownerType === 'VEHICLE'
+          ? { vehicleId: ownerId }
+          : { inspectionId: ownerId };
     return this.prisma.document.findMany({
-      where: {
-        companyId: actor.companyId,
-        ownerType,
-        ...(ownerType === 'CUSTOMER' ? { customerId: ownerId } : { vehicleId: ownerId }),
-      },
+      where: { companyId: actor.companyId, ownerType, ...ownerFilter },
       orderBy: { createdAt: 'desc' },
     });
   }

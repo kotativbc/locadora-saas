@@ -13,6 +13,10 @@ export function companyLogoDir(companyId: string): string {
   return path.join(UPLOADS_ROOT, 'companies', companyId);
 }
 
-export function ownerDocumentsDir(companyId: string, ownerType: 'customers' | 'vehicles', ownerId: string): string {
+export function ownerDocumentsDir(
+  companyId: string,
+  ownerType: 'customers' | 'vehicles' | 'inspections',
+  ownerId: string,
+): string {
   return path.join(UPLOADS_ROOT, companyId, ownerType, ownerId);
 }

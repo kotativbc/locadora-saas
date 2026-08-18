@@ -25,6 +25,9 @@ model Company {
   documents Document[]
   ratePlans RatePlan[]
   contracts Contract[]
+  inspections   Inspection[]
+  damages       Damage[]
+  maintenances  Maintenance[]
 
   @@map("companies")
 }
@@ -168,6 +171,9 @@ model Vehicle {
   documents Document[]
   ratePlans RatePlan[]
   contracts Contract[]
+  inspections Inspection[]
+  damages     Damage[]
+  maintenances Maintenance[]
 
   @@unique([companyId, plate])
   @@index([companyId])
@@ -202,27 +208,30 @@ model Customer {
   @@map("customers")
 }
 
-/// Documento privado anexado a um cliente ou veículo (CNH, CRLV, RG etc.).
+/// Documento privado anexado a um cliente, veículo ou vistoria (CNH, CRLV, fotos etc.).
 /// Nunca servido estaticamente — sempre lido e transmitido pela API após checar permissão.
 model Document {
-  id               String    @id @default(uuid())
+  id               String      @id @default(uuid())
   companyId        String
-  company          Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  ownerType        String // CUSTOMER | VEHICLE
+  company          Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  ownerType        String // CUSTOMER | VEHICLE | INSPECTION
   customerId       String?
-  customer         Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customer         Customer?   @relation(fields: [customerId], references: [id], onDelete: Cascade)
   vehicleId        String?
-  vehicle          Vehicle?  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
-  label            String // ex: "CNH frente", "CRLV", "RG"
+  vehicle          Vehicle?    @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  inspectionId     String?
+  inspection       Inspection? @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+  label            String // ex: "CNH frente", "CRLV", "Foto lateral direita"
   filePath         String // relativo à raiz de uploads privados
   mimeType         String
   sizeBytes        Int
   uploadedByUserId String?
-  createdAt        DateTime  @default(now())
+  createdAt        DateTime    @default(now())
 
   @@index([companyId])
   @@index([customerId])
   @@index([vehicleId])
+  @@index([inspectionId])
   @@map("documents")
 }
 
@@ -266,11 +275,15 @@ model Contract {
   dailyRateSnapshot Decimal   @db.Decimal(10, 2)
   totalValue        Decimal   @db.Decimal(10, 2)
   status            String    @default("draft") // draft | awaiting_signature | active | completed | cancelled
+  deliveredAt       DateTime? // preenchido ao registrar a vistoria de entrega
+  returnedAt        DateTime? // preenchido ao registrar a vistoria de devolução
   createdByUserId   String?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
-  signature ContractSignature?
+  signature   ContractSignature?
+  inspections Inspection[]
+  damages     Damage[]
 
   @@index([companyId])
   @@index([customerId])
@@ -296,4 +309,77 @@ model ContractSignature {
   createdAt       DateTime  @default(now())
 
   @@map("contract_signatures")
+}
+
+/// Vistoria de entrega ou devolução de um veículo, sempre ligada a um contrato.
+model Inspection {
+  id                String   @id @default(uuid())
+  companyId         String
+  company           Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contractId        String
+  contract          Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  vehicleId         String
+  vehicle           Vehicle  @relation(fields: [vehicleId], references: [id])
+  type              String // delivery | return
+  performedAt       DateTime @default(now())
+  odometerKm        Int
+  fuelLevel         String // cheio | 3/4 | 1/2 | 1/4 | reserva
+  exteriorNotes     String?
+  performedByUserId String?
+  createdAt         DateTime @default(now())
+
+  photos  Document[]
+  damages Damage[]
+
+  @@index([companyId])
+  @@index([contractId])
+  @@map("inspections")
+}
+
+/// Avaria de um veículo — encontrada numa vistoria ou registrada avulsa.
+model Damage {
+  id               String      @id @default(uuid())
+  companyId        String
+  company          Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  vehicleId        String
+  vehicle          Vehicle     @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  contractId       String?
+  contract         Contract?   @relation(fields: [contractId], references: [id], onDelete: SetNull)
+  inspectionId     String?
+  inspection       Inspection? @relation(fields: [inspectionId], references: [id], onDelete: SetNull)
+  description      String
+  severity         String      @default("minor") // minor | moderate | severe
+  estimatedCost    Decimal?    @db.Decimal(10, 2)
+  chargeToCustomer Boolean     @default(false)
+  status           String      @default("open") // open | resolved
+  createdByUserId  String?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  @@index([companyId])
+  @@index([vehicleId])
+  @@map("damages")
+}
+
+/// Registro de manutenção de um veículo — independente de contrato.
+model Maintenance {
+  id              String    @id @default(uuid())
+  companyId       String
+  company         Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  vehicleId       String
+  vehicle         Vehicle   @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  type            String // preventive | corrective
+  description     String
+  performedAt     DateTime  @default(now())
+  odometerKm      Int?
+  cost            Decimal?  @db.Decimal(10, 2)
+  vendor          String?
+  nextDueDate     DateTime?
+  nextDueKm       Int?
+  createdByUserId String?
+  createdAt       DateTime  @default(now())
+
+  @@index([companyId])
+  @@index([vehicleId])
+  @@map("maintenances")
 }

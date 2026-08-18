@@ -34,6 +34,16 @@ export function Layout() {
               Contratos
             </NavLink>
           )}
+          {hasPermission('fleet.manage') && (
+            <NavLink to="/manutencao" className={({ isActive }) => `sidebar__link${isActive ? ' active' : ''}`}>
+              Manutenção
+            </NavLink>
+          )}
+          {hasPermission('fleet.manage') && (
+            <NavLink to="/avarias" className={({ isActive }) => `sidebar__link${isActive ? ' active' : ''}`}>
+              Avarias
+            </NavLink>
+          )}
           {hasPermission('rates.manage') && (
             <NavLink to="/tarifas" className={({ isActive }) => `sidebar__link${isActive ? ' active' : ''}`}>
               Tarifas

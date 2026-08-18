@@ -27,6 +27,8 @@ interface Contract {
   startDate: string;
   endDate: string;
   totalValue: string;
+  deliveredAt: string | null;
+  returnedAt: string | null;
   customer: { name: string; document: string };
   vehicle: { plate: string; brand: string; model: string };
   signature: { signedAt: string | null; expiresAt: string; token: string } | null;
@@ -53,6 +55,9 @@ export function Contracts() {
   const [error, setError] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [linkInfo, setLinkInfo] = useState<{ contractId: string; url: string } | null>(null);
+  const [inspectionTarget, setInspectionTarget] = useState<{ contract: Contract; type: 'delivery' | 'return' } | null>(
+    null,
+  );
 
   async function load() {
     setLoading(true);
@@ -152,6 +157,7 @@ export function Contracts() {
                 <th>Período</th>
                 <th>Valor</th>
                 <th>Status</th>
+                <th>Entrega/Devolução</th>
                 <th>Ações</th>
               </tr>
             </thead>
@@ -168,13 +174,38 @@ export function Contracts() {
                   </td>
                   <td>{formatCurrency(c.totalValue)}</td>
                   <td>{STATUS_LABELS[c.status] ?? c.status}</td>
-                  <td style={{ display: 'flex', gap: 6 }}>
+                  <td style={{ fontSize: 12, color: 'var(--ink-muted)' }}>
+                    {c.returnedAt
+                      ? `Devolvido em ${new Date(c.returnedAt).toLocaleDateString('pt-BR')}`
+                      : c.deliveredAt
+                        ? `Entregue em ${new Date(c.deliveredAt).toLocaleDateString('pt-BR')}`
+                        : '—'}
+                  </td>
+                  <td style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                     <button className="logout-btn" style={{ color: 'var(--primary)', borderColor: 'var(--border)' }} onClick={() => handleViewPdf(c.id)}>
                       PDF
                     </button>
                     {c.status === 'draft' && (
                       <button className="logout-btn" style={{ color: 'var(--primary)', borderColor: 'var(--border)' }} onClick={() => handleGenerateLink(c.id)}>
                         Gerar link
+                      </button>
+                    )}
+                    {c.status === 'active' && !c.deliveredAt && (
+                      <button
+                        className="logout-btn"
+                        style={{ color: 'var(--primary)', borderColor: 'var(--border)' }}
+                        onClick={() => setInspectionTarget({ contract: c, type: 'delivery' })}
+                      >
+                        Registrar entrega
+                      </button>
+                    )}
+                    {c.status === 'active' && c.deliveredAt && !c.returnedAt && (
+                      <button
+                        className="logout-btn"
+                        style={{ color: 'var(--primary)', borderColor: 'var(--border)' }}
+                        onClick={() => setInspectionTarget({ contract: c, type: 'return' })}
+                      >
+                        Registrar devolução
                       </button>
                     )}
                   </td>
@@ -184,6 +215,18 @@ export function Contracts() {
           </table>
         )}
       </div>
+
+      {inspectionTarget && (
+        <InspectionForm
+          contract={inspectionTarget.contract}
+          type={inspectionTarget.type}
+          onDone={() => {
+            setInspectionTarget(null);
+            load();
+          }}
+          onCancel={() => setInspectionTarget(null)}
+        />
+      )}
 
       {formOpen && (
         <NewContractForm
@@ -311,6 +354,94 @@ function NewContractForm({
       <button className="btn" type="submit" disabled={submitting}>
         {submitting ? 'Criando...' : 'Criar contrato (rascunho)'}
       </button>
+    </form>
+  );
+}
+
+const FUEL_LEVELS = ['cheio', '3/4', '1/2', '1/4', 'reserva'];
+
+function InspectionForm({
+  contract,
+  type,
+  onDone,
+  onCancel,
+}: {
+  contract: Contract;
+  type: 'delivery' | 'return';
+  onDone: () => void;
+  onCancel: () => void;
+}) {
+  const [odometerKm, setOdometerKm] = useState('');
+  const [fuelLevel, setFuelLevel] = useState('cheio');
+  const [exteriorNotes, setExteriorNotes] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const lateDays =
+    type === 'return'
+      ? Math.ceil((Date.now() - new Date(contract.endDate).getTime()) / (1000 * 60 * 60 * 24))
+      : 0;
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    try {
+      await api.post('/inspections', {
+        contractId: contract.id,
+        type,
+        odometerKm: Number(odometerKm),
+        fuelLevel,
+        exteriorNotes: exteriorNotes || undefined,
+      });
+      onDone();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erro ao registrar vistoria.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <form className="card" style={{ borderColor: 'var(--accent)' }} onSubmit={handleSubmit}>
+      <h3 style={{ marginTop: 0 }}>
+        {type === 'delivery' ? 'Registrar entrega' : 'Registrar devolução'} — {contract.vehicle.plate}
+      </h3>
+      <p style={{ fontSize: 13, color: 'var(--ink-muted)', marginTop: -8 }}>
+        Cliente: {contract.customer.name}
+      </p>
+      {error && <div className="error-banner">{error}</div>}
+      {type === 'return' && lateDays > 0 && (
+        <div className="error-banner" style={{ background: '#fff4e0', color: '#8a5a00', borderColor: '#f0d8a0' }}>
+          Devolução {lateDays} {lateDays === 1 ? 'dia' : 'dias'} após a data prevista ({new Date(contract.endDate).toLocaleDateString('pt-BR')}).
+        </div>
+      )}
+      <div className="field">
+        <label>Odômetro (km)</label>
+        <input required type="number" min="0" value={odometerKm} onChange={(e) => setOdometerKm(e.target.value)} />
+      </div>
+      <div className="field">
+        <label>Nível de combustível</label>
+        <select value={fuelLevel} onChange={(e) => setFuelLevel(e.target.value)}>
+          {FUEL_LEVELS.map((level) => (
+            <option key={level} value={level}>
+              {level}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="field">
+        <label>Observações (opcional)</label>
+        <input value={exteriorNotes} onChange={(e) => setExteriorNotes(e.target.value)} placeholder="Estado da lataria, itens, etc." />
+      </div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button className="btn" type="submit" disabled={submitting}>
+          {submitting ? 'Salvando...' : 'Confirmar'}
+        </button>
+        <button type="button" className="logout-btn" style={{ color: 'var(--ink-muted)', borderColor: 'var(--border)' }} onClick={onCancel}>
+          Cancelar
+        </button>
+      </div>
     </form>
   );
 }
