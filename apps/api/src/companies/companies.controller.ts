@@ -16,6 +16,7 @@ import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 import { ChangeCompanyStatusDto } from './dto/change-company-status.dto';
 import { SetUserActiveDto } from './dto/set-user-active.dto';
+import { SetCompanyPlanDto } from './dto/set-company-plan.dto';
 import { UsersService } from '../users/users.service';
 import { RequirePermissions } from '../rbac/permissions.decorator';
 import { PermissionCode } from '../rbac/rbac.constants';
@@ -80,6 +81,13 @@ export class CompaniesController {
   @RequirePermissions(PermissionCode.COMPANIES_MANAGE, PermissionCode.PLATFORM_MANAGE)
   getSummary(@Param('id') id: string, @CurrentUser() actor: RequestUser) {
     return this.companiesService.getSummary(id, actor);
+  }
+
+  /** Só Super Admin — troca o plano de uma empresa. */
+  @Post(':id/plan')
+  @RequirePermissions(PermissionCode.PLATFORM_MANAGE)
+  setPlan(@Param('id') id: string, @Body() dto: SetCompanyPlanDto, @CurrentUser() actor: RequestUser) {
+    return this.companiesService.setPlan(id, dto.planId, actor);
   }
 
   // ---------- Suporte: Super Admin agindo sobre usuários de qualquer empresa ----------

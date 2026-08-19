@@ -8,6 +8,7 @@ import * as argon2 from 'argon2';
 import * as crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../common/audit-log.service';
+import { PlanLimitsService } from '../plans/plan-limits.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { RequestUser } from '../auth/types';
@@ -27,12 +28,15 @@ export class UsersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditLog: AuditLogService,
+    private readonly planLimits: PlanLimitsService,
   ) {}
 
   async create(dto: CreateUserDto, actor: RequestUser) {
     if (!actor.companyId) {
       throw new ForbiddenException('Usuários de plataforma não gerenciam usuários de empresa por aqui.');
     }
+
+    await this.planLimits.assertCanAddUser(actor.companyId);
 
     const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
     if (existing) {

@@ -44,7 +44,7 @@ export class CompaniesService {
 
     const company = await this.prisma.$transaction(async (tx) => {
       const created = await tx.company.create({
-        data: { name: dto.name, tradeName: dto.tradeName, cnpj: dto.cnpj, status: CompanyStatus.ACTIVE },
+        data: { name: dto.name, tradeName: dto.tradeName, cnpj: dto.cnpj, planId: dto.planId, status: CompanyStatus.ACTIVE },
       });
 
       await tx.companyStatusEvent.create({
@@ -173,7 +173,7 @@ export class CompaniesService {
   /** Números de consumo pra página de detalhe — só contagens leves, nada de listar tudo. */
   async getSummary(id: string, actor: RequestUser) {
     this.assertCanAccess(id, actor);
-    const company = await this.prisma.company.findUnique({ where: { id } });
+    const company = await this.prisma.company.findUnique({ where: { id }, include: { plan: true } });
     if (!company) {
       throw new NotFoundException('Empresa não encontrada.');
     }
@@ -187,6 +187,33 @@ export class CompaniesService {
     ]);
 
     return { company, consumption: { users, vehicles, customers, contracts, activeContracts } };
+  }
+
+  /** Só Super Admin — atribui ou remove o plano de uma empresa. */
+  async setPlan(id: string, planId: string | undefined, actor: RequestUser) {
+    const company = await this.prisma.company.findUnique({ where: { id } });
+    if (!company) {
+      throw new NotFoundException('Empresa não encontrada.');
+    }
+    if (planId) {
+      const plan = await this.prisma.plan.findUnique({ where: { id: planId } });
+      if (!plan) {
+        throw new NotFoundException('Plano não encontrado.');
+      }
+    }
+
+    const updated = await this.prisma.company.update({ where: { id }, data: { planId: planId ?? null } });
+
+    await this.auditLog.record({
+      action: 'company.plan_change',
+      userId: actor.id,
+      companyId: id,
+      entityType: 'Company',
+      entityId: id,
+      metadata: { planId: planId ?? null },
+    });
+
+    return updated;
   }
 
   async saveLogo(id: string, file: Express.Multer.File, actor: RequestUser) {

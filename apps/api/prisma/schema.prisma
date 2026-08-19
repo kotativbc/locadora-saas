@@ -16,6 +16,8 @@ model Company {
   logoPath     String? // caminho relativo dentro de /srv/rental-data/uploads, nunca uma URL pública direta
   status       String   @default("active") // pending | trial | active | past_due | suspended | cancelled | archived | security_blocked
   statusReason String? // motivo do estado atual (obrigatório ao suspender/cancelar/bloquear)
+  planId       String?
+  plan         Plan?    @relation(fields: [planId], references: [id], onDelete: SetNull)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -37,6 +39,24 @@ model Company {
   statusEvents  CompanyStatusEvent[]
 
   @@map("companies")
+}
+
+/// Plano da plataforma — limites centralizados aqui, nunca espalhados pelos
+/// módulos que os consomem (Frota, Usuários checam contra isso, não
+/// reinventam a regra cada um do seu jeito).
+model Plan {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  name        String
+  maxVehicles Int? // null = sem limite
+  maxUsers    Int? // null = sem limite
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  companies Company[]
+
+  @@map("plans")
 }
 
 /// Histórico append-only de mudança de estado de uma empresa (auditoria de ciclo de vida).

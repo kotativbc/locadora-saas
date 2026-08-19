@@ -16,6 +16,7 @@ import {
   BarChart3,
   UserCog,
   History,
+  Layers,
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { BrandMark } from './BrandMark';
@@ -59,6 +60,9 @@ export function Layout() {
               <div className="sidebar__section-label">Plataforma</div>
               <NavLink to="/empresas" className={linkClass}>
                 <Building2 /> Empresas
+              </NavLink>
+              <NavLink to="/planos" className={linkClass}>
+                <Layers /> Planos
               </NavLink>
               {hasPermission('audit.view') && (
                 <NavLink to="/auditoria" className={linkClass}>

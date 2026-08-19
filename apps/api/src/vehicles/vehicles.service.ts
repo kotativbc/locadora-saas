@@ -1,6 +1,7 @@
 import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../common/audit-log.service';
+import { PlanLimitsService } from '../plans/plan-limits.service';
 import { CreateVehicleDto } from './dto/create-vehicle.dto';
 import { UpdateVehicleDto } from './dto/update-vehicle.dto';
 import { RequestUser } from '../auth/types';
@@ -10,12 +11,15 @@ export class VehiclesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditLog: AuditLogService,
+    private readonly planLimits: PlanLimitsService,
   ) {}
 
   async create(dto: CreateVehicleDto, actor: RequestUser) {
     if (!actor.companyId) {
       throw new ForbiddenException('Somente usuários de uma empresa podem cadastrar veículos.');
     }
+
+    await this.planLimits.assertCanAddVehicle(actor.companyId);
 
     const plateInUse = await this.prisma.vehicle.findUnique({
       where: { companyId_plate: { companyId: actor.companyId, plate: dto.plate.toUpperCase() } },

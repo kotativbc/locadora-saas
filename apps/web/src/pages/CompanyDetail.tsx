@@ -6,6 +6,14 @@ import { EmptyState } from '../components/EmptyState';
 import { StatusBadge } from '../components/StatusBadge';
 import { ChangeCompanyStatusForm, COMPANY_STATUS_LABELS, COMPANY_STATUS_VARIANT } from '../components/CompanyStatusControls';
 
+interface Plan {
+  id: string;
+  name: string;
+  maxVehicles: number | null;
+  maxUsers: number | null;
+  active: boolean;
+}
+
 interface Company {
   id: string;
   name: string;
@@ -13,6 +21,8 @@ interface Company {
   cnpj: string | null;
   status: string;
   statusReason: string | null;
+  planId: string | null;
+  plan: Plan | null;
   createdAt: string;
 }
 
@@ -53,6 +63,10 @@ export function CompanyDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [statusFormOpen, setStatusFormOpen] = useState(false);
+  const [planFormOpen, setPlanFormOpen] = useState(false);
+  const [availablePlans, setAvailablePlans] = useState<Plan[]>([]);
+  const [selectedPlanId, setSelectedPlanId] = useState('');
+  const [savingPlan, setSavingPlan] = useState(false);
   const [savingUserId, setSavingUserId] = useState<string | null>(null);
   const [tempPassword, setTempPassword] = useState<{ email: string; password: string } | null>(null);
 
@@ -68,6 +82,8 @@ export function CompanyDetail() {
       setSummary(s);
       setHistory(h);
       setUsers(u);
+      setSelectedPlanId(s.company.planId ?? '');
+      api.get<Plan[]>('/plans').then((all) => setAvailablePlans(all.filter((p) => p.active))).catch(() => {});
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Erro ao carregar dados da empresa.');
     } finally {
@@ -106,6 +122,21 @@ export function CompanyDetail() {
       setError(err instanceof ApiError ? err.message : 'Erro ao redefinir senha.');
     } finally {
       setSavingUserId(null);
+    }
+  }
+
+  async function handleChangePlan() {
+    if (!id) return;
+    setSavingPlan(true);
+    setError(null);
+    try {
+      await api.post(`/companies/${id}/plan`, { planId: selectedPlanId || undefined });
+      setPlanFormOpen(false);
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erro ao trocar o plano.');
+    } finally {
+      setSavingPlan(false);
     }
   }
 
@@ -163,14 +194,59 @@ export function CompanyDetail() {
         />
       )}
 
+      <div className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <div style={{ fontSize: 12, color: 'var(--ink-muted)', marginBottom: 4 }}>Plano</div>
+          <strong>{company.plan?.name ?? 'Sem plano (sem limite)'}</strong>
+        </div>
+        <button
+          className="logout-btn"
+          style={{ color: 'var(--rtv-navy-900)', borderColor: 'var(--rtv-line-strong)' }}
+          onClick={() => setPlanFormOpen((v) => !v)}
+        >
+          {planFormOpen ? 'Cancelar' : 'Mudar plano'}
+        </button>
+      </div>
+
+      {planFormOpen && (
+        <div className="card">
+          <div className="field" style={{ marginBottom: 10 }}>
+            <label>Novo plano</label>
+            <select value={selectedPlanId} onChange={(e) => setSelectedPlanId(e.target.value)}>
+              <option value="">Sem plano (sem limite)</option>
+              {availablePlans.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <button className="btn" disabled={savingPlan} onClick={handleChangePlan}>
+            {savingPlan ? 'Salvando...' : 'Confirmar plano'}
+          </button>
+        </div>
+      )}
+
       <div className="kpi-grid">
         <div className="kpi-card">
-          <div className="kpi-card__label">Usuários</div>
-          <div className="kpi-card__value">{consumption.users}</div>
+          <div className="kpi-card__label">Usuários {company.plan?.maxUsers ? `(limite: ${company.plan.maxUsers})` : ''}</div>
+          <div
+            className="kpi-card__value"
+            style={company.plan?.maxUsers && consumption.users >= company.plan.maxUsers ? { color: 'var(--rtv-danger)' } : undefined}
+          >
+            {consumption.users}
+            {company.plan?.maxUsers ? ` / ${company.plan.maxUsers}` : ''}
+          </div>
         </div>
         <div className="kpi-card">
-          <div className="kpi-card__label">Veículos</div>
-          <div className="kpi-card__value">{consumption.vehicles}</div>
+          <div className="kpi-card__label">Veículos {company.plan?.maxVehicles ? `(limite: ${company.plan.maxVehicles})` : ''}</div>
+          <div
+            className="kpi-card__value"
+            style={company.plan?.maxVehicles && consumption.vehicles >= company.plan.maxVehicles ? { color: 'var(--rtv-danger)' } : undefined}
+          >
+            {consumption.vehicles}
+            {company.plan?.maxVehicles ? ` / ${company.plan.maxVehicles}` : ''}
+          </div>
         </div>
         <div className="kpi-card">
           <div className="kpi-card__label">Clientes</div>

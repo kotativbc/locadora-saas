@@ -146,15 +146,27 @@ export function Companies() {
   );
 }
 
+interface PlanOption {
+  id: string;
+  name: string;
+  active: boolean;
+}
+
 function NewCompanyForm({ onCreated }: { onCreated: () => void }) {
   const [name, setName] = useState('');
   const [tradeName, setTradeName] = useState('');
   const [cnpj, setCnpj] = useState('');
+  const [planId, setPlanId] = useState('');
+  const [plans, setPlans] = useState<PlanOption[]>([]);
   const [adminName, setAdminName] = useState('');
   const [adminEmail, setAdminEmail] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    api.get<PlanOption[]>('/plans').then((all) => setPlans(all.filter((p) => p.active))).catch(() => {});
+  }, []);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -165,6 +177,7 @@ function NewCompanyForm({ onCreated }: { onCreated: () => void }) {
         name,
         tradeName: tradeName || undefined,
         cnpj: cnpj || undefined,
+        planId: planId || undefined,
         adminName,
         adminEmail,
         adminPassword,
@@ -194,6 +207,20 @@ function NewCompanyForm({ onCreated }: { onCreated: () => void }) {
         <div className="field" style={{ marginBottom: 0 }}>
           <label>CNPJ (opcional)</label>
           <input value={cnpj} onChange={(e) => setCnpj(e.target.value)} />
+        </div>
+      </div>
+      <div className="field-group">
+        <div className="field-group__label">Plano</div>
+        <div className="field" style={{ marginBottom: 0 }}>
+          <label>Plano (opcional — sem plano fica sem limite)</label>
+          <select value={planId} onChange={(e) => setPlanId(e.target.value)}>
+            <option value="">Sem plano (sem limite)</option>
+            {plans.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
       <div className="field-group">

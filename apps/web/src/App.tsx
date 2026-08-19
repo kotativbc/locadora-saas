@@ -6,6 +6,7 @@ import { Login } from './pages/Login';
 import { Home } from './pages/Home';
 import { Companies } from './pages/Companies';
 import { CompanyDetail } from './pages/CompanyDetail';
+import { Plans } from './pages/Plans';
 import { MyCompany } from './pages/MyCompany';
 import { Users } from './pages/Users';
 import { Fleet } from './pages/Fleet';
@@ -35,6 +36,7 @@ export function App() {
               <Route path="/" element={<Home />} />
               <Route path="/empresas" element={<Companies />} />
               <Route path="/empresas/:id" element={<CompanyDetail />} />
+              <Route path="/planos" element={<Plans />} />
               <Route path="/minha-empresa" element={<MyCompany />} />
               <Route path="/usuarios" element={<Users />} />
               <Route path="/frota" element={<Fleet />} />

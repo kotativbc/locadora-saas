@@ -1,4 +1,4 @@
-import { IsEmail, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
 
 export class CreateCompanyDto {
   @IsString()
@@ -12,6 +12,10 @@ export class CreateCompanyDto {
   @IsOptional()
   @IsString()
   cnpj?: string;
+
+  @IsOptional()
+  @IsUUID()
+  planId?: string;
 
   @IsString()
   @MinLength(2)
