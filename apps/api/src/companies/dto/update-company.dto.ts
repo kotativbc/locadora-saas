@@ -1,4 +1,4 @@
-import { IsBoolean, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsOptional, IsString, MinLength } from 'class-validator';
 
 export class UpdateCompanyDto {
   @IsOptional()
@@ -13,8 +13,4 @@ export class UpdateCompanyDto {
   @IsOptional()
   @IsString()
   cnpj?: string;
-
-  @IsOptional()
-  @IsBoolean()
-  active?: boolean;
 }

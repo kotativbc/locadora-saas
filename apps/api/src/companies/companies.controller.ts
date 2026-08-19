@@ -14,6 +14,7 @@ import { Response } from 'express';
 import { CompaniesService } from './companies.service';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
+import { ChangeCompanyStatusDto } from './dto/change-company-status.dto';
 import { RequirePermissions } from '../rbac/permissions.decorator';
 import { PermissionCode } from '../rbac/rbac.constants';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -51,9 +52,22 @@ export class CompaniesController {
   }
 
   @Patch(':id')
-  @RequirePermissions(PermissionCode.COMPANIES_MANAGE)
+  @RequirePermissions(PermissionCode.COMPANIES_MANAGE, PermissionCode.PLATFORM_MANAGE)
   update(@Param('id') id: string, @Body() dto: UpdateCompanyDto, @CurrentUser() actor: RequestUser) {
     return this.companiesService.update(id, dto, actor);
+  }
+
+  /** Só Super Admin — muda o estado do ciclo de vida (suspender, reativar, arquivar etc). */
+  @Post(':id/status')
+  @RequirePermissions(PermissionCode.PLATFORM_MANAGE)
+  changeStatus(@Param('id') id: string, @Body() dto: ChangeCompanyStatusDto, @CurrentUser() actor: RequestUser) {
+    return this.companiesService.changeStatus(id, dto, actor);
+  }
+
+  @Get(':id/status-history')
+  @RequirePermissions(PermissionCode.COMPANIES_MANAGE, PermissionCode.PLATFORM_MANAGE)
+  getStatusHistory(@Param('id') id: string, @CurrentUser() actor: RequestUser) {
+    return this.companiesService.getStatusHistory(id, actor);
   }
 
   @Post(':id/logo')

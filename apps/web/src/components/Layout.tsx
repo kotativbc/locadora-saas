@@ -15,6 +15,7 @@ import {
   ReceiptText,
   BarChart3,
   UserCog,
+  History,
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { BrandMark } from './BrandMark';
@@ -59,6 +60,11 @@ export function Layout() {
               <NavLink to="/empresas" className={linkClass}>
                 <Building2 /> Empresas
               </NavLink>
+              {hasPermission('audit.view') && (
+                <NavLink to="/auditoria" className={linkClass}>
+                  <History /> Auditoria
+                </NavLink>
+              )}
             </>
           )}
 
@@ -143,12 +149,19 @@ export function Layout() {
             </>
           )}
 
-          {hasPermission('users.manage') && (
+          {(hasPermission('users.manage') || hasPermission('audit.view')) && user?.companyId && (
             <>
               <div className="sidebar__section-label">Administração</div>
-              <NavLink to="/usuarios" className={linkClass}>
-                <UserCog /> Usuários
-              </NavLink>
+              {hasPermission('users.manage') && (
+                <NavLink to="/usuarios" className={linkClass}>
+                  <UserCog /> Usuários
+                </NavLink>
+              )}
+              {hasPermission('audit.view') && (
+                <NavLink to="/auditoria" className={linkClass}>
+                  <History /> Auditoria
+                </NavLink>
+              )}
             </>
           )}
         </nav>

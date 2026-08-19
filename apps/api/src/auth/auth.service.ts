@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as argon2 from 'argon2';
@@ -7,6 +7,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../common/audit-log.service';
 import { JwtPayload } from './types';
 import { PermissionCode } from '../rbac/rbac.constants';
+import { BLOCKING_COMPANY_STATUSES, COMPANY_STATUS_LABELS, CompanyStatus } from '../companies/company-status.constants';
 
 const ACCESS_TOKEN_TTL = '15m';
 const REFRESH_TOKEN_TTL_DAYS = 7;
@@ -25,6 +26,7 @@ export class AuthService {
       where: { email },
       include: {
         roles: { include: { role: { include: { permissions: { include: { permission: true } } } } } },
+        company: { select: { status: true } },
       },
     });
 
@@ -38,6 +40,8 @@ export class AuthService {
     if (!passwordValid) {
       throw new UnauthorizedException('E-mail ou senha inválidos.');
     }
+
+    this.assertCompanyAllowsAccess(user.company?.status);
 
     const roles = user.roles.map((ur) => ur.role.code);
     const permissions = Array.from(
@@ -88,6 +92,7 @@ export class AuthService {
         user: {
           include: {
             roles: { include: { role: { include: { permissions: { include: { permission: true } } } } } },
+            company: { select: { status: true } },
           },
         },
       },
@@ -96,6 +101,11 @@ export class AuthService {
     if (!stored || stored.revokedAt || stored.expiresAt < new Date() || !stored.user.active) {
       throw new UnauthorizedException('Sessão expirada, faça login novamente.');
     }
+
+    // Empresa pode ter sido suspensa/bloqueada depois que a sessão começou —
+    // checa de novo a cada refresh, então o bloqueio vale em até 15 minutos
+    // (duração do access token), não só no próximo login.
+    this.assertCompanyAllowsAccess(stored.user.company?.status);
 
     // Rotaciona o refresh token (revoga o antigo, emite um novo) — reduz o
     // impacto de um token roubado, já que só é válido por um uso.
@@ -124,6 +134,17 @@ export class AuthService {
       where: { tokenHash, revokedAt: null },
       data: { revokedAt: new Date() },
     });
+  }
+
+  /** Usuário de plataforma (sem empresa, ex: Super Admin) não passa por essa checagem. */
+  private assertCompanyAllowsAccess(companyStatus: string | undefined) {
+    if (!companyStatus) return;
+    if (BLOCKING_COMPANY_STATUSES.has(companyStatus as CompanyStatus)) {
+      const label = COMPANY_STATUS_LABELS[companyStatus as CompanyStatus] ?? companyStatus;
+      throw new ForbiddenException(
+        `O acesso desta empresa está bloqueado (status: ${label}). Fale com o administrador da plataforma.`,
+      );
+    }
   }
 
   private async issueRefreshToken(userId: string): Promise<string> {

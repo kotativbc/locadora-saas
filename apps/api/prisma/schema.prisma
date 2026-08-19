@@ -9,14 +9,15 @@ datasource db {
 
 /// Empresa locadora cadastrada na plataforma (tenant).
 model Company {
-  id          String   @id @default(uuid())
-  name        String
-  tradeName   String?
-  cnpj        String?  @unique
-  logoPath    String? // caminho relativo dentro de /srv/rental-data/uploads, nunca uma URL pública direta
-  active      Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           String   @id @default(uuid())
+  name         String
+  tradeName    String?
+  cnpj         String?  @unique
+  logoPath     String? // caminho relativo dentro de /srv/rental-data/uploads, nunca uma URL pública direta
+  status       String   @default("active") // pending | trial | active | past_due | suspended | cancelled | archived | security_blocked
+  statusReason String? // motivo do estado atual (obrigatório ao suspender/cancelar/bloquear)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   users     User[]
   auditLogs AuditLog[]
@@ -33,8 +34,24 @@ model Company {
   vehiclePositions VehiclePosition[]
   charges       Charge[]
   expenses      Expense[]
+  statusEvents  CompanyStatusEvent[]
 
   @@map("companies")
+}
+
+/// Histórico append-only de mudança de estado de uma empresa (auditoria de ciclo de vida).
+model CompanyStatusEvent {
+  id              String   @id @default(uuid())
+  companyId       String
+  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  fromStatus      String?
+  toStatus        String
+  reason          String?
+  changedByUserId String?
+  createdAt       DateTime @default(now())
+
+  @@index([companyId])
+  @@map("company_status_events")
 }
 
 /// Usuário da plataforma. companyId nulo = usuário da plataforma (Super Admin).

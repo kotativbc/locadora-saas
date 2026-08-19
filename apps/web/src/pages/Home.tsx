@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Car, Users, FileText, BarChart3 } from 'lucide-react';
+import { Car, Users, FileText, BarChart3, Building2, History } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { api, ApiError } from '../api';
 
@@ -11,28 +11,43 @@ interface FinancialSummary {
   activeContracts: number;
 }
 
+interface Company {
+  id: string;
+  status: string;
+}
+
 function formatCurrency(value: string) {
   return Number(value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
 const QUICK_ACTIONS: { to: string; label: string; icon: typeof Car; permission: string }[] = [
+  { to: '/empresas', label: 'Ver empresas', icon: Building2, permission: 'platform.manage' },
   { to: '/frota', label: 'Ver frota', icon: Car, permission: 'fleet.manage' },
   { to: '/clientes', label: 'Ver clientes', icon: Users, permission: 'customers.manage' },
   { to: '/contratos', label: 'Ver contratos', icon: FileText, permission: 'contracts.manage' },
   { to: '/relatorios', label: 'Ver relatórios', icon: BarChart3, permission: 'reports.view' },
+  { to: '/auditoria', label: 'Ver auditoria', icon: History, permission: 'audit.view' },
 ];
 
 export function Home() {
   const { user, hasPermission } = useAuth();
   const [summary, setSummary] = useState<FinancialSummary | null>(null);
+  const [companies, setCompanies] = useState<Company[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!hasPermission('reports.view')) return;
-    api
-      .get<FinancialSummary>('/reports/financial-summary')
-      .then(setSummary)
-      .catch((err) => setError(err instanceof ApiError ? err.message : null));
+    if (hasPermission('reports.view')) {
+      api
+        .get<FinancialSummary>('/reports/financial-summary')
+        .then(setSummary)
+        .catch((err) => setError(err instanceof ApiError ? err.message : null));
+    }
+    if (hasPermission('platform.manage')) {
+      api
+        .get<Company[]>('/companies')
+        .then(setCompanies)
+        .catch((err) => setError(err instanceof ApiError ? err.message : null));
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -46,6 +61,21 @@ export function Home() {
       </div>
 
       {error && <div className="error-banner">{error}</div>}
+
+      {companies && (
+        <div className="kpi-grid">
+          <div className="kpi-card">
+            <div className="kpi-card__label">Empresas na plataforma</div>
+            <div className="kpi-card__value">{companies.length}</div>
+          </div>
+          <div className="kpi-card">
+            <div className="kpi-card__label">Ativas</div>
+            <div className="kpi-card__value kpi-card__value--success">
+              {companies.filter((c) => c.status === 'active').length}
+            </div>
+          </div>
+        </div>
+      )}
 
       {summary && (
         <div className="kpi-grid">
@@ -94,7 +124,7 @@ export function Home() {
         </div>
       )}
 
-      {!summary && actions.length === 0 && (
+      {!summary && !companies && actions.length === 0 && (
         <div className="card">
           <p style={{ margin: 0 }}>Bem-vindo à Rentovix. Use o menu ao lado para navegar.</p>
         </div>

@@ -21,8 +21,11 @@ export class PermissionsGuard implements CanActivate {
     const req = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const userPermissions = new Set(req.user?.permissions ?? []);
 
-    const hasAll = required.every((perm) => userPermissions.has(perm));
-    if (!hasAll) {
+    // "Pelo menos uma" das permissões listadas — não "todas". Hoje nenhuma
+    // rota exige mais de uma permissão ao mesmo tempo; isso existe pra
+    // permitir "A ou B" (ex: dono da empresa OU Super Admin da plataforma).
+    const hasAny = required.some((perm) => userPermissions.has(perm));
+    if (!hasAny) {
       throw new ForbiddenException('Você não tem permissão para executar esta ação.');
     }
     return true;

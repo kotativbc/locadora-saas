@@ -20,6 +20,7 @@ import { Tracking } from './pages/Tracking';
 import { Finance } from './pages/Finance';
 import { Expenses } from './pages/Expenses';
 import { Reports } from './pages/Reports';
+import { AuditLog } from './pages/AuditLog';
 
 export function App() {
   return (
@@ -46,6 +47,7 @@ export function App() {
               <Route path="/financeiro" element={<Finance />} />
               <Route path="/despesas" element={<Expenses />} />
               <Route path="/relatorios" element={<Reports />} />
+              <Route path="/auditoria" element={<AuditLog />} />
             </Route>
           </Route>
         </Routes>

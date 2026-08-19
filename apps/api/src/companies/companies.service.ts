@@ -1,4 +1,4 @@
-import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import * as argon2 from 'argon2';
 import * as fs from 'fs/promises';
 import * as path from 'path';
@@ -6,9 +6,16 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../common/audit-log.service';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
+import { ChangeCompanyStatusDto } from './dto/change-company-status.dto';
 import { RoleCode } from '../rbac/rbac.constants';
 import { companyLogoDir } from '../common/storage';
 import { RequestUser } from '../auth/types';
+import {
+  CompanyStatus,
+  COMPANY_STATUS_LABELS,
+  REASON_REQUIRED_STATUSES,
+  isValidStatusTransition,
+} from './company-status.constants';
 
 @Injectable()
 export class CompaniesService {
@@ -17,7 +24,7 @@ export class CompaniesService {
     private readonly auditLog: AuditLogService,
   ) {}
 
-  /** Somente Super Admin: cria a empresa e já cria o primeiro usuário Admin dela. */
+  /** Somente Super Admin: cria a empresa e já cria o primeiro usuário Admin dela. Nasce "Ativa". */
   async create(dto: CreateCompanyDto, actor: RequestUser) {
     const emailInUse = await this.prisma.user.findUnique({ where: { email: dto.adminEmail } });
     if (emailInUse) {
@@ -37,7 +44,11 @@ export class CompaniesService {
 
     const company = await this.prisma.$transaction(async (tx) => {
       const created = await tx.company.create({
-        data: { name: dto.name, tradeName: dto.tradeName, cnpj: dto.cnpj },
+        data: { name: dto.name, tradeName: dto.tradeName, cnpj: dto.cnpj, status: CompanyStatus.ACTIVE },
+      });
+
+      await tx.companyStatusEvent.create({
+        data: { companyId: created.id, fromStatus: null, toStatus: CompanyStatus.ACTIVE, changedByUserId: actor.id },
       });
 
       await tx.user.create({
@@ -92,6 +103,71 @@ export class CompaniesService {
     });
 
     return company;
+  }
+
+  /**
+   * Só Super Admin muda o estado do ciclo de vida de uma empresa — nunca o
+   * próprio admin da empresa. Valida a transição contra a única fonte de
+   * verdade (company-status.constants.ts), exige motivo pros estados que
+   * precisam, e grava tanto o histórico quanto a auditoria.
+   */
+  async changeStatus(id: string, dto: ChangeCompanyStatusDto, actor: RequestUser) {
+    const company = await this.prisma.company.findUnique({ where: { id } });
+    if (!company) {
+      throw new NotFoundException('Empresa não encontrada.');
+    }
+
+    const fromStatus = company.status as CompanyStatus;
+    const toStatus = dto.status;
+
+    if (!isValidStatusTransition(fromStatus, toStatus)) {
+      throw new BadRequestException(
+        `Não é possível ir de "${COMPANY_STATUS_LABELS[fromStatus]}" para "${COMPANY_STATUS_LABELS[toStatus]}".`,
+      );
+    }
+    if (REASON_REQUIRED_STATUSES.has(toStatus) && !dto.reason?.trim()) {
+      throw new BadRequestException(
+        `Informe o motivo pra mudar o estado da empresa para "${COMPANY_STATUS_LABELS[toStatus]}".`,
+      );
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.company.update({
+        where: { id },
+        data: { status: toStatus, statusReason: dto.reason ?? null },
+      });
+
+      await tx.companyStatusEvent.create({
+        data: {
+          companyId: id,
+          fromStatus,
+          toStatus,
+          reason: dto.reason,
+          changedByUserId: actor.id,
+        },
+      });
+
+      return result;
+    });
+
+    await this.auditLog.record({
+      action: 'company.status_change',
+      userId: actor.id,
+      companyId: id,
+      entityType: 'Company',
+      entityId: id,
+      metadata: { fromStatus, toStatus, reason: dto.reason },
+    });
+
+    return updated;
+  }
+
+  async getStatusHistory(id: string, actor: RequestUser) {
+    this.assertCanAccess(id, actor);
+    return this.prisma.companyStatusEvent.findMany({
+      where: { companyId: id },
+      orderBy: { createdAt: 'desc' },
+    });
   }
 
   async saveLogo(id: string, file: Express.Multer.File, actor: RequestUser) {

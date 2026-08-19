@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { RequestUser } from '../auth/types';
+import { RoleCode } from '../rbac/rbac.constants';
 
 interface AuditEntry {
   action: string;
@@ -37,5 +39,26 @@ export class AuditLogService {
       // eslint-disable-next-line no-console
       console.error('[audit-log] falha ao gravar evento de auditoria', entry.action, err);
     }
+  }
+
+  /**
+   * Super Admin (sem empresa) vê o log de toda a plataforma; qualquer outro
+   * usuário só vê o log da própria empresa — nunca de outra.
+   */
+  async findRecent(actor: RequestUser, limit = 200) {
+    const isSuperAdmin = actor.roles.includes(RoleCode.SUPER_ADMIN);
+    if (!isSuperAdmin && !actor.companyId) {
+      return [];
+    }
+
+    return this.prisma.auditLog.findMany({
+      where: isSuperAdmin ? {} : { companyId: actor.companyId },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      include: {
+        user: { select: { name: true, email: true } },
+        company: { select: { name: true } },
+      },
+    });
   }
 }

@@ -8,7 +8,7 @@ interface Company {
   tradeName: string | null;
   cnpj: string | null;
   logoPath: string | null;
-  active: boolean;
+  status: string;
 }
 
 export function MyCompany() {
