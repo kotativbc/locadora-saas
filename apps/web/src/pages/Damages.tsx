@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { api, ApiError } from '../api';
+import { StatusBadge } from '../components/StatusBadge';
 
 interface Vehicle {
   id: string;
@@ -108,7 +109,12 @@ export function Damages() {
                   <td>{SEVERITY_LABELS[d.severity] ?? d.severity}</td>
                   <td>{d.estimatedCost ? formatCurrency(d.estimatedCost) : '—'}</td>
                   <td>{d.chargeToCustomer ? 'Sim' : 'Não'}</td>
-                  <td>{d.status === 'resolved' ? 'Resolvida' : 'Em aberto'}</td>
+                  <td>
+                    <StatusBadge
+                      label={d.status === 'resolved' ? 'Resolvida' : 'Em aberto'}
+                      variant={d.status === 'resolved' ? 'success' : 'warning'}
+                    />
+                  </td>
                   <td>
                     {d.status === 'open' && (
                       <button

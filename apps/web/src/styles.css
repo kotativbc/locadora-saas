@@ -1,16 +1,62 @@
+/* =========================================================================
+   Rentovix — Design System
+   Referência: painel de instrumentos de veículo — leituras claras, fundo
+   calmo, cor só onde precisa dizer algo. Ver docs/design/rentovix-design.md
+   pra racional completo (paleta, tipografia, elemento de assinatura).
+   ========================================================================= */
+
 :root {
-  --bg: #f5f4f1;
-  --surface: #ffffff;
-  --border: #e4e1da;
-  --ink: #1c1b1a;
-  --ink-muted: #6b6862;
-  --primary: #1f2e4d;
+  /* Superfícies */
+  --rtv-canvas: #f5f7fa;
+  --rtv-surface: #ffffff;
+  --rtv-surface-alt: #fafbfc;
+
+  /* Marca */
+  --rtv-navy-900: #16213e;
+  --rtv-navy-800: #1e2c4f;
+  --rtv-navy-700: #2a3b67;
+  --rtv-amber-500: #e08a3c;
+  --rtv-amber-600: #c8752c;
+  --rtv-teal-500: #0e7c86;
+  --rtv-teal-600: #0b6870;
+
+  /* Texto */
+  --rtv-ink-900: #171b24;
+  --rtv-ink-600: #4b5568;
+  --rtv-ink-400: #8a93a6;
+
+  /* Linhas */
+  --rtv-line: #e3e7ee;
+  --rtv-line-strong: #cbd2de;
+
+  /* Status */
+  --rtv-success: #1f8a5f;
+  --rtv-success-bg: #e7f5ee;
+  --rtv-warning: #c9821b;
+  --rtv-warning-bg: #fbf0dd;
+  --rtv-danger: #c13b2e;
+  --rtv-danger-bg: #fbeae7;
+  --rtv-info: #2563a6;
+  --rtv-info-bg: #e8f0f9;
+
+  /* Compat: nomes antigos usados em alguns inline styles legados */
+  --bg: var(--rtv-canvas);
+  --surface: var(--rtv-surface);
+  --border: var(--rtv-line);
+  --ink: var(--rtv-ink-900);
+  --ink-muted: var(--rtv-ink-600);
+  --primary: var(--rtv-navy-900);
   --primary-ink: #ffffff;
-  --accent: #d98a2b;
-  --danger: #b3432e;
-  --danger-bg: #fbeae6;
-  --success: #3a7a56;
-  --radius: 8px;
+  --accent: var(--rtv-amber-500);
+  --danger: var(--rtv-danger);
+  --danger-bg: var(--rtv-danger-bg);
+  --success: var(--rtv-success);
+
+  --radius: 10px;
+  --radius-sm: 6px;
+  --shadow-sm: 0 1px 2px rgba(23, 27, 36, 0.06);
+  --shadow-md: 0 4px 16px rgba(23, 27, 36, 0.08);
+
   --font-ui:
     -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --font-mono: ui-monospace, 'SF Mono', 'Cascadia Code', Consolas, monospace;
@@ -29,20 +75,34 @@ body,
 body {
   margin: 0;
   font-family: var(--font-ui);
-  background: var(--bg);
-  color: var(--ink);
+  background: var(--rtv-canvas);
+  color: var(--rtv-ink-900);
   -webkit-font-smoothing: antialiased;
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 button,
-input {
+input,
+select {
   font-family: inherit;
   font-size: inherit;
 }
 
 a {
-  color: inherit;
+  color: var(--rtv-teal-600);
 }
+
+::selection {
+  background: rgba(224, 138, 60, 0.25);
+}
+
+:focus-visible {
+  outline: 2px solid var(--rtv-amber-500);
+  outline-offset: 2px;
+}
+
+/* ---------- Shell / navegação ---------- */
 
 .app-shell {
   display: flex;
@@ -50,120 +110,213 @@ a {
 }
 
 .sidebar {
-  width: 240px;
+  width: 250px;
   flex-shrink: 0;
-  background: var(--primary);
-  color: var(--primary-ink);
+  background: var(--rtv-navy-900);
+  color: #fff;
   display: flex;
   flex-direction: column;
-  padding: 24px 0;
+  padding: 20px 0;
 }
 
 .sidebar__brand {
-  padding: 0 20px 20px;
-  font-weight: 700;
-  font-size: 15px;
-  letter-spacing: 0.02em;
-  border-bottom: 1px dashed rgba(255, 255, 255, 0.25);
-  margin-bottom: 12px;
+  padding: 0 20px 18px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.brand-mark {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.brand-mark__glyph {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+.brand-mark__word {
+  font-weight: 800;
+  font-size: 16.5px;
+  letter-spacing: -0.01em;
+  color: #fff;
+}
+
+.brand-mark__word em {
+  font-style: normal;
+  color: var(--rtv-amber-500);
+}
+
+.sidebar__tenant {
+  margin-top: 6px;
+  font-size: 11.5px;
+  color: rgba(255, 255, 255, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .sidebar__nav {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 0 12px;
+  padding: 4px 12px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.sidebar__section-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.38);
+  padding: 14px 12px 6px;
+}
+
+.sidebar__section-label:first-child {
+  padding-top: 4px;
 }
 
 .sidebar__link {
-  display: block;
-  padding: 10px 12px;
-  border-radius: var(--radius);
-  color: rgba(255, 255, 255, 0.85);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: var(--radius-sm);
+  color: rgba(255, 255, 255, 0.82);
   text-decoration: none;
-  font-size: 14px;
+  font-size: 13.5px;
+  font-weight: 500;
   position: relative;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.sidebar__link svg {
+  width: 17px;
+  height: 17px;
+  flex-shrink: 0;
+  opacity: 0.85;
 }
 
 .sidebar__link:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.07);
+  color: #fff;
 }
 
 .sidebar__link.active {
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(224, 138, 60, 0.14);
   color: #fff;
   font-weight: 600;
+}
+
+.sidebar__link.active svg {
+  opacity: 1;
+  color: var(--rtv-amber-500);
 }
 
 .sidebar__link.active::before {
   content: '';
   position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 3px;
-  background: var(--accent);
-  border-radius: 0 2px 2px 0;
+  left: -12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--rtv-amber-500);
+  box-shadow: 6px 0 0 0 rgba(224, 138, 60, 0.35);
 }
 
 .sidebar__footer {
   margin-top: auto;
-  padding: 12px 20px 0;
-  border-top: 1px dashed rgba(255, 255, 255, 0.25);
+  padding: 14px 20px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .sidebar__user {
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.7);
-  margin-bottom: 8px;
+  font-size: 12.5px;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 10px;
+  line-height: 1.4;
+}
+
+.sidebar__user strong {
+  display: block;
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 13.5px;
+  font-weight: 600;
 }
 
 .logout-btn {
   background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.28);
   color: #fff;
   padding: 7px 12px;
-  border-radius: var(--radius);
+  border-radius: var(--radius-sm);
   cursor: pointer;
   font-size: 13px;
+  transition: background 0.12s ease, border-color 0.12s ease;
 }
 
 .logout-btn:hover {
   background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.4);
 }
 
 .main {
   flex: 1;
-  padding: 32px 40px;
+  padding: 30px 40px;
   overflow-y: auto;
+  min-width: 0;
 }
 
+/* ---------- Cabeçalho de página ---------- */
+
 .page-header {
-  margin-bottom: 24px;
+  margin-bottom: 22px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
 }
 
 .page-header h1 {
-  font-size: 22px;
+  font-size: 21px;
+  font-weight: 700;
   margin: 0 0 4px;
+  letter-spacing: -0.01em;
+  color: var(--rtv-ink-900);
 }
 
 .page-header__rule {
-  width: 48px;
+  width: 34px;
   height: 0;
-  border-top: 2px dashed var(--accent);
-  margin: 10px 0 0;
+  border-top: 2.5px dashed var(--rtv-amber-500);
+  margin: 9px 0 0;
 }
 
+/* ---------- Cartões / superfícies ---------- */
+
 .card {
-  background: var(--surface);
-  border: 1px solid var(--border);
+  background: var(--rtv-surface);
+  border: 1px solid var(--rtv-line);
   border-radius: var(--radius);
   padding: 20px;
+  box-shadow: var(--shadow-sm);
 }
 
 .card + .card {
   margin-top: 16px;
 }
+
+/* ---------- Formulários ---------- */
 
 .field {
   display: flex;
@@ -173,120 +326,314 @@ a {
 }
 
 .field label {
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 600;
-  color: var(--ink-muted);
+  color: var(--rtv-ink-600);
 }
 
 .field input,
 .field select {
   padding: 9px 11px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
-  color: var(--ink);
+  border: 1px solid var(--rtv-line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--rtv-surface);
+  color: var(--rtv-ink-900);
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
 }
 
 .field input:focus,
-.field select:focus,
-button:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
+.field select:focus {
+  border-color: var(--rtv-amber-500);
+  box-shadow: 0 0 0 3px rgba(224, 138, 60, 0.15);
+  outline: none;
 }
+
+select {
+  border: 1px solid var(--rtv-line-strong);
+  border-radius: var(--radius-sm);
+  padding: 6px 9px;
+  background: var(--rtv-surface);
+  color: var(--rtv-ink-900);
+}
+
+/* ---------- Botões ---------- */
 
 .btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: var(--primary);
+  background: var(--rtv-navy-900);
   color: #fff;
   border: none;
-  padding: 10px 16px;
-  border-radius: var(--radius);
+  padding: 10px 18px;
+  border-radius: var(--radius-sm);
   font-weight: 600;
+  font-size: 13.5px;
   cursor: pointer;
+  transition: background 0.12s ease, transform 0.05s ease;
 }
 
 .btn:hover {
-  filter: brightness(1.1);
+  background: var(--rtv-navy-700);
+}
+
+.btn:active {
+  transform: translateY(1px);
 }
 
 .btn:disabled {
-  opacity: 0.6;
+  opacity: 0.55;
   cursor: not-allowed;
 }
 
 .btn--accent {
-  background: var(--accent);
-  color: #1a1105;
+  background: var(--rtv-amber-500);
+  color: #241205;
 }
 
+.btn--accent:hover {
+  background: var(--rtv-amber-600);
+}
+
+/* ---------- Alertas ---------- */
+
 .error-banner {
-  background: var(--danger-bg);
-  color: var(--danger);
-  border: 1px solid rgba(179, 67, 46, 0.25);
-  border-radius: var(--radius);
+  background: var(--rtv-danger-bg);
+  color: var(--rtv-danger);
+  border: 1px solid rgba(193, 59, 46, 0.22);
+  border-radius: var(--radius-sm);
   padding: 10px 14px;
-  font-size: 14px;
+  font-size: 13.5px;
   margin-bottom: 16px;
 }
+
+/* ---------- Selos (placa, monoespaçado) ---------- */
 
 .plate {
   font-family: var(--font-mono);
   font-size: 12px;
   letter-spacing: 0.04em;
-  background: var(--bg);
-  border: 1px solid var(--border);
+  background: var(--rtv-canvas);
+  border: 1px solid var(--rtv-line-strong);
   border-radius: 4px;
   padding: 2px 7px;
   display: inline-block;
+  font-weight: 600;
 }
+
+/* ---------- Badges de status ---------- */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.badge::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.badge--success {
+  background: var(--rtv-success-bg);
+  color: var(--rtv-success);
+}
+
+.badge--warning {
+  background: var(--rtv-warning-bg);
+  color: var(--rtv-warning);
+}
+
+.badge--danger {
+  background: var(--rtv-danger-bg);
+  color: var(--rtv-danger);
+}
+
+.badge--info {
+  background: var(--rtv-info-bg);
+  color: var(--rtv-info);
+}
+
+.badge--neutral {
+  background: #eef0f4;
+  color: var(--rtv-ink-600);
+}
+
+/* ---------- Tabelas ---------- */
 
 table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 14px;
+  font-size: 13.5px;
 }
 
 th {
   text-align: left;
-  color: var(--ink-muted);
-  font-size: 12px;
+  color: var(--rtv-ink-600);
+  font-size: 11px;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
-  padding: 8px 10px;
-  border-bottom: 1px solid var(--border);
+  letter-spacing: 0.04em;
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--rtv-line);
+  background: var(--rtv-surface-alt);
 }
 
 td {
-  padding: 10px;
-  border-bottom: 1px solid var(--border);
+  padding: 11px 10px;
+  border-bottom: 1px solid var(--rtv-line);
+  color: var(--rtv-ink-900);
 }
+
+tbody tr {
+  transition: background 0.1s ease;
+}
+
+tbody tr:hover {
+  background: var(--rtv-surface-alt);
+}
+
+td.num,
+th.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Dashboard / KPIs ---------- */
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.kpi-card {
+  background: var(--rtv-surface);
+  border: 1px solid var(--rtv-line);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  box-shadow: var(--shadow-sm);
+}
+
+.kpi-card__label {
+  font-size: 12px;
+  color: var(--rtv-ink-600);
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+
+.kpi-card__value {
+  font-size: 22px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.kpi-card__value--success {
+  color: var(--rtv-success);
+}
+
+.kpi-card__value--danger {
+  color: var(--rtv-danger);
+}
+
+/* ---------- Estado vazio ---------- */
+
+.empty-state {
+  text-align: center;
+  padding: 36px 20px;
+  color: var(--rtv-ink-600);
+}
+
+.empty-state__title {
+  font-weight: 700;
+  color: var(--rtv-ink-900);
+  margin-bottom: 4px;
+  font-size: 14.5px;
+}
+
+.empty-state__body {
+  font-size: 13px;
+  max-width: 360px;
+  margin: 0 auto;
+}
+
+/* ---------- Login / assinatura pública ---------- */
 
 .login-screen {
   min-height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--primary);
+  background: radial-gradient(circle at 30% 20%, var(--rtv-navy-700), var(--rtv-navy-900) 65%);
+  padding: 20px;
 }
 
 .login-card {
-  background: var(--surface);
-  border-radius: var(--radius);
-  padding: 36px 32px;
-  width: 340px;
+  background: var(--rtv-surface);
+  border-radius: 14px;
+  padding: 34px 32px;
+  width: 360px;
+  box-shadow: var(--shadow-md);
 }
 
 .login-card h1 {
-  font-size: 18px;
+  font-size: 19px;
+  font-weight: 700;
   margin: 0 0 4px;
+  letter-spacing: -0.01em;
 }
 
 .login-card p {
-  color: var(--ink-muted);
+  color: var(--rtv-ink-600);
   font-size: 13px;
-  margin: 0 0 20px;
+  margin: 0 0 22px;
+}
+
+.login-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 26px;
+}
+
+.login-brand__glyph {
+  width: 30px;
+  height: 30px;
+}
+
+.login-brand__word {
+  font-weight: 800;
+  font-size: 19px;
+  color: var(--rtv-navy-900);
+  letter-spacing: -0.01em;
+}
+
+.login-brand__word em {
+  font-style: normal;
+  color: var(--rtv-amber-600);
+}
+
+.powered-by {
+  text-align: center;
+  font-size: 11px;
+  color: var(--rtv-ink-400);
+  margin-top: 18px;
+}
+
+.powered-by em {
+  font-style: normal;
+  color: var(--rtv-ink-600);
+  font-weight: 700;
 }
 
 /* ---------- Mobile ---------- */
@@ -312,7 +659,7 @@ td {
     display: flex;
     align-items: center;
     gap: 12px;
-    background: var(--primary);
+    background: var(--rtv-navy-900);
     color: #fff;
     padding: 12px 16px;
     position: sticky;
@@ -332,8 +679,16 @@ td {
   }
 
   .mobile-topbar__brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     font-weight: 700;
-    font-size: 15px;
+    font-size: 14.5px;
+  }
+
+  .mobile-topbar__brand svg {
+    width: 18px;
+    height: 18px;
   }
 
   .sidebar-backdrop {
@@ -349,8 +704,8 @@ td {
     top: 0;
     left: 0;
     bottom: 0;
-    width: 260px;
-    max-width: 82vw;
+    width: 270px;
+    max-width: 84vw;
     transform: translateX(-100%);
     transition: transform 0.2s ease;
     z-index: 30;
@@ -385,13 +740,13 @@ td {
     max-width: 360px;
   }
 
-  .login-screen {
-    padding: 20px;
+  .kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
 
   /* Tabelas: o CARD rola na horizontal, a tabela em si mantém display:table
      de verdade (display:block direto na table quebra o alinhamento interno
-     de thead/tr/td — é exatamente isso que causava o layout desconfigurado). */
+     de thead/tr/td). */
   .card {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
@@ -407,5 +762,11 @@ td {
   select,
   .field input {
     min-height: 40px;
+  }
+}
+
+@media (max-width: 480px) {
+  .kpi-grid {
+    grid-template-columns: 1fr 1fr;
   }
 }

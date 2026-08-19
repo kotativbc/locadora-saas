@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { api, ApiError, fetchFileUrl } from '../api';
+import { api, ApiError, fetchFileUrl, copyToClipboard } from '../api';
+import { StatusBadge, type BadgeVariant } from '../components/StatusBadge';
 
 interface Customer {
   id: string;
@@ -42,6 +43,14 @@ const STATUS_LABELS: Record<string, string> = {
   cancelled: 'Cancelado',
 };
 
+const STATUS_VARIANT: Record<string, BadgeVariant> = {
+  draft: 'neutral',
+  awaiting_signature: 'warning',
+  active: 'success',
+  completed: 'info',
+  cancelled: 'danger',
+};
+
 function formatCurrency(value: string) {
   return Number(value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
@@ -55,6 +64,7 @@ export function Contracts() {
   const [error, setError] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [linkInfo, setLinkInfo] = useState<{ contractId: string; url: string } | null>(null);
+  const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'failed'>('idle');
   const [inspectionTarget, setInspectionTarget] = useState<{ contract: Contract; type: 'delivery' | 'return' } | null>(
     null,
   );
@@ -85,6 +95,7 @@ export function Contracts() {
 
   async function handleGenerateLink(contractId: string) {
     setError(null);
+    setCopyStatus('idle');
     try {
       const { token } = await api.post<{ token: string; expiresAt: string }>(
         `/contracts/${contractId}/signature-link`,
@@ -95,6 +106,13 @@ export function Contracts() {
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Erro ao gerar link de assinatura.');
     }
+  }
+
+  async function handleCopyLink() {
+    if (!linkInfo) return;
+    const ok = await copyToClipboard(linkInfo.url);
+    setCopyStatus(ok ? 'copied' : 'failed');
+    setTimeout(() => setCopyStatus('idle'), 2500);
   }
 
   async function handleViewPdf(contractId: string) {
@@ -124,10 +142,16 @@ export function Contracts() {
           </p>
           <div style={{ display: 'flex', gap: 8 }}>
             <input readOnly value={linkInfo.url} style={{ flex: 1, padding: 8, fontFamily: 'var(--font-mono)', fontSize: 12 }} />
-            <button className="btn" onClick={() => navigator.clipboard.writeText(linkInfo.url)}>
-              Copiar
+            <button className="btn" onClick={handleCopyLink}>
+              {copyStatus === 'copied' ? 'Copiado ✓' : 'Copiar'}
             </button>
           </div>
+          {copyStatus === 'failed' && (
+            <p style={{ fontSize: 12, color: 'var(--danger)', marginTop: 8, marginBottom: 0 }}>
+              Não consegui copiar automaticamente — selecione o texto no campo acima e copie manualmente
+              (Ctrl+C ou tocar e segurar no celular).
+            </p>
+          )}
           <button
             className="logout-btn"
             style={{ marginTop: 10, color: 'var(--ink-muted)', borderColor: 'var(--border)' }}
@@ -173,7 +197,9 @@ export function Contracts() {
                     {new Date(c.endDate).toLocaleDateString('pt-BR')}
                   </td>
                   <td>{formatCurrency(c.totalValue)}</td>
-                  <td>{STATUS_LABELS[c.status] ?? c.status}</td>
+                  <td>
+                    <StatusBadge label={STATUS_LABELS[c.status] ?? c.status} variant={STATUS_VARIANT[c.status] ?? 'neutral'} />
+                  </td>
                   <td style={{ fontSize: 12, color: 'var(--ink-muted)' }}>
                     {c.returnedAt
                       ? `Devolvido em ${new Date(c.returnedAt).toLocaleDateString('pt-BR')}`

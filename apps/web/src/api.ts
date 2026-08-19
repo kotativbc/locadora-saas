@@ -85,6 +85,39 @@ export async function fetchFileUrl(path: string): Promise<string> {
   return URL.createObjectURL(blob);
 }
 
+/**
+ * Copia texto pra área de transferência, com fallback pra quando o site está
+ * em HTTP puro (sem domínio/TLS ainda) — a API navigator.clipboard só
+ * funciona em contexto seguro (HTTPS ou localhost); em HTTP ela nem existe
+ * no objeto navigator, então chamar direto falha silenciosamente.
+ */
+export async function copyToClipboard(text: string): Promise<boolean> {
+  if (navigator.clipboard && window.isSecureContext) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      // cai pro fallback abaixo
+    }
+  }
+
+  try {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.left = '-9999px';
+    textarea.style.top = '0';
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    const success = document.execCommand('copy');
+    document.body.removeChild(textarea);
+    return success;
+  } catch {
+    return false;
+  }
+}
+
 export const api = {
   get: <T>(path: string) => apiRequest<T>(path),
   post: <T>(path: string, body?: unknown) =>

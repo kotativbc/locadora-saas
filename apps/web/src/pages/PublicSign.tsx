@@ -120,6 +120,10 @@ export function PublicSign() {
             </button>
           </>
         )}
+
+        <p className="powered-by">
+          via <em>Rentovix</em>
+        </p>
       </div>
     </div>
   );

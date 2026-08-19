@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { ApiError } from '../api';
+import { BrandMark } from '../components/BrandMark';
 
 export function Login() {
   const { login } = useAuth();
@@ -28,8 +29,14 @@ export function Login() {
   return (
     <div className="login-screen">
       <form className="login-card" onSubmit={handleSubmit}>
-        <h1>Plataforma de Locação</h1>
-        <p>Entre com sua conta para continuar.</p>
+        <div className="login-brand">
+          <BrandMark size={30} />
+          <span className="login-brand__word">
+            Rent<em>ovix</em>
+          </span>
+        </div>
+        <h1>Entrar na plataforma</h1>
+        <p>Use as credenciais da sua empresa para continuar.</p>
         {error && <div className="error-banner">{error}</div>}
         <div className="field">
           <label htmlFor="email">E-mail</label>
