@@ -5,6 +5,7 @@ import { Layout } from './components/Layout';
 import { Login } from './pages/Login';
 import { Home } from './pages/Home';
 import { Companies } from './pages/Companies';
+import { CompanyDetail } from './pages/CompanyDetail';
 import { MyCompany } from './pages/MyCompany';
 import { Users } from './pages/Users';
 import { Fleet } from './pages/Fleet';
@@ -33,6 +34,7 @@ export function App() {
             <Route element={<Layout />}>
               <Route path="/" element={<Home />} />
               <Route path="/empresas" element={<Companies />} />
+              <Route path="/empresas/:id" element={<CompanyDetail />} />
               <Route path="/minha-empresa" element={<MyCompany />} />
               <Route path="/usuarios" element={<Users />} />
               <Route path="/frota" element={<Fleet />} />

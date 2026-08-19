@@ -15,6 +15,8 @@ import { CompaniesService } from './companies.service';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 import { ChangeCompanyStatusDto } from './dto/change-company-status.dto';
+import { SetUserActiveDto } from './dto/set-user-active.dto';
+import { UsersService } from '../users/users.service';
 import { RequirePermissions } from '../rbac/permissions.decorator';
 import { PermissionCode } from '../rbac/rbac.constants';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -24,7 +26,10 @@ const MAX_LOGO_BYTES = 2 * 1024 * 1024; // 2MB
 
 @Controller('companies')
 export class CompaniesController {
-  constructor(private readonly companiesService: CompaniesService) {}
+  constructor(
+    private readonly companiesService: CompaniesService,
+    private readonly usersService: UsersService,
+  ) {}
 
   @Post()
   @RequirePermissions(PermissionCode.PLATFORM_MANAGE)
@@ -68,6 +73,38 @@ export class CompaniesController {
   @RequirePermissions(PermissionCode.COMPANIES_MANAGE, PermissionCode.PLATFORM_MANAGE)
   getStatusHistory(@Param('id') id: string, @CurrentUser() actor: RequestUser) {
     return this.companiesService.getStatusHistory(id, actor);
+  }
+
+  /** Página de detalhe: dados da empresa + números de consumo (usuários, veículos, clientes, contratos). */
+  @Get(':id/summary')
+  @RequirePermissions(PermissionCode.COMPANIES_MANAGE, PermissionCode.PLATFORM_MANAGE)
+  getSummary(@Param('id') id: string, @CurrentUser() actor: RequestUser) {
+    return this.companiesService.getSummary(id, actor);
+  }
+
+  // ---------- Suporte: Super Admin agindo sobre usuários de qualquer empresa ----------
+
+  @Get(':id/users')
+  @RequirePermissions(PermissionCode.PLATFORM_MANAGE)
+  listUsers(@Param('id') id: string) {
+    return this.usersService.findAllForCompany(id);
+  }
+
+  @Patch(':id/users/:userId/active')
+  @RequirePermissions(PermissionCode.PLATFORM_MANAGE)
+  setUserActive(
+    @Param('id') id: string,
+    @Param('userId') userId: string,
+    @Body() dto: SetUserActiveDto,
+    @CurrentUser() actor: RequestUser,
+  ) {
+    return this.usersService.setActiveForSupport(id, userId, dto.active, actor);
+  }
+
+  @Post(':id/users/:userId/reset-password')
+  @RequirePermissions(PermissionCode.PLATFORM_MANAGE)
+  resetUserPassword(@Param('id') id: string, @Param('userId') userId: string, @CurrentUser() actor: RequestUser) {
+    return this.usersService.resetPasswordForSupport(id, userId, actor);
   }
 
   @Post(':id/logo')

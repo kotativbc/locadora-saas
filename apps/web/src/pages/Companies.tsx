@@ -1,7 +1,9 @@
 import { useEffect, useState, type FormEvent } from 'react';
+import { Link } from 'react-router-dom';
 import { api, ApiError } from '../api';
 import { EmptyState } from '../components/EmptyState';
-import { StatusBadge, type BadgeVariant } from '../components/StatusBadge';
+import { StatusBadge } from '../components/StatusBadge';
+import { ChangeCompanyStatusForm, COMPANY_STATUS_LABELS, COMPANY_STATUS_VARIANT } from '../components/CompanyStatusControls';
 
 interface Company {
   id: string;
@@ -13,46 +15,12 @@ interface Company {
   createdAt: string;
 }
 
-interface StatusEvent {
-  id: string;
-  fromStatus: string | null;
-  toStatus: string;
-  reason: string | null;
-  createdAt: string;
-}
-
-const STATUS_LABELS: Record<string, string> = {
-  pending: 'Pendente',
-  trial: 'Em teste',
-  active: 'Ativa',
-  past_due: 'Em atraso',
-  suspended: 'Suspensa',
-  cancelled: 'Cancelada',
-  archived: 'Arquivada',
-  security_blocked: 'Bloqueada por segurança',
-};
-
-const STATUS_VARIANT: Record<string, BadgeVariant> = {
-  pending: 'neutral',
-  trial: 'info',
-  active: 'success',
-  past_due: 'warning',
-  suspended: 'danger',
-  cancelled: 'danger',
-  archived: 'neutral',
-  security_blocked: 'danger',
-};
-
-const REASON_REQUIRED = new Set(['suspended', 'cancelled', 'security_blocked']);
-
 export function Companies() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [statusTarget, setStatusTarget] = useState<Company | null>(null);
-  const [historyTarget, setHistoryTarget] = useState<Company | null>(null);
-  const [history, setHistory] = useState<StatusEvent[]>([]);
 
   async function load() {
     setLoading(true);
@@ -68,15 +36,6 @@ export function Companies() {
   useEffect(() => {
     load();
   }, []);
-
-  async function handleShowHistory(company: Company) {
-    setHistoryTarget(company);
-    try {
-      setHistory(await api.get<StatusEvent[]>(`/companies/${company.id}/status-history`));
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Erro ao carregar histórico.');
-    }
-  }
 
   const activeCount = companies.filter((c) => c.status === 'active').length;
   const blockedCount = companies.filter((c) => ['suspended', 'cancelled', 'archived', 'security_blocked'].includes(c.status)).length;
@@ -133,29 +92,33 @@ export function Companies() {
             <tbody>
               {companies.map((c) => (
                 <tr key={c.id}>
-                  <td>{c.name}</td>
+                  <td>
+                    <Link to={`/empresas/${c.id}`} style={{ color: 'var(--rtv-navy-900)', fontWeight: 600, textDecoration: 'none' }}>
+                      {c.name}
+                    </Link>
+                  </td>
                   <td>{c.cnpj ? <span className="plate">{c.cnpj}</span> : '—'}</td>
                   <td>
-                    <StatusBadge label={STATUS_LABELS[c.status] ?? c.status} variant={STATUS_VARIANT[c.status] ?? 'neutral'} />
+                    <StatusBadge label={COMPANY_STATUS_LABELS[c.status] ?? c.status} variant={COMPANY_STATUS_VARIANT[c.status] ?? 'neutral'} />
                     {c.statusReason && (
                       <div style={{ fontSize: 11, color: 'var(--rtv-ink-400)', marginTop: 3 }}>{c.statusReason}</div>
                     )}
                   </td>
                   <td>{new Date(c.createdAt).toLocaleDateString('pt-BR')}</td>
                   <td style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    <Link
+                      to={`/empresas/${c.id}`}
+                      className="logout-btn"
+                      style={{ color: 'var(--rtv-navy-900)', borderColor: 'var(--rtv-line-strong)', textDecoration: 'none' }}
+                    >
+                      Ver detalhes
+                    </Link>
                     <button
                       className="logout-btn"
                       style={{ color: 'var(--rtv-navy-900)', borderColor: 'var(--rtv-line-strong)' }}
                       onClick={() => setStatusTarget(c)}
                     >
                       Mudar estado
-                    </button>
-                    <button
-                      className="logout-btn"
-                      style={{ color: 'var(--rtv-navy-900)', borderColor: 'var(--rtv-line-strong)' }}
-                      onClick={() => handleShowHistory(c)}
-                    >
-                      Histórico
                     </button>
                   </td>
                 </tr>
@@ -166,8 +129,10 @@ export function Companies() {
       </div>
 
       {statusTarget && (
-        <ChangeStatusForm
-          company={statusTarget}
+        <ChangeCompanyStatusForm
+          companyId={statusTarget.id}
+          companyName={statusTarget.name}
+          currentStatus={statusTarget.status}
           onDone={() => {
             setStatusTarget(null);
             load();
@@ -176,98 +141,8 @@ export function Companies() {
         />
       )}
 
-      {historyTarget && (
-        <div className="card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-            <strong>Histórico — {historyTarget.name}</strong>
-            <button className="logout-btn" style={{ color: 'var(--ink-muted)', borderColor: 'var(--border)' }} onClick={() => setHistoryTarget(null)}>
-              Fechar
-            </button>
-          </div>
-          {history.length === 0 ? (
-            <p style={{ margin: 0, fontSize: 13, color: 'var(--ink-muted)' }}>Sem mudanças de estado registradas.</p>
-          ) : (
-            <table>
-              <thead>
-                <tr>
-                  <th>Quando</th>
-                  <th>De</th>
-                  <th>Para</th>
-                  <th>Motivo</th>
-                </tr>
-              </thead>
-              <tbody>
-                {history.map((h) => (
-                  <tr key={h.id}>
-                    <td>{new Date(h.createdAt).toLocaleString('pt-BR')}</td>
-                    <td>{h.fromStatus ? STATUS_LABELS[h.fromStatus] ?? h.fromStatus : '—'}</td>
-                    <td>{STATUS_LABELS[h.toStatus] ?? h.toStatus}</td>
-                    <td>{h.reason ?? '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      )}
-
       {formOpen && <NewCompanyForm onCreated={() => { setFormOpen(false); load(); }} />}
     </div>
-  );
-}
-
-function ChangeStatusForm({ company, onDone, onCancel }: { company: Company; onDone: () => void; onCancel: () => void }) {
-  const [status, setStatus] = useState(company.status);
-  const [reason, setReason] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    setError(null);
-    setSubmitting(true);
-    try {
-      await api.post(`/companies/${company.id}/status`, { status, reason: reason || undefined });
-      onDone();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Erro ao mudar o estado da empresa.');
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  return (
-    <form className="card" style={{ borderColor: 'var(--accent)' }} onSubmit={handleSubmit}>
-      <h3 style={{ marginTop: 0 }}>Mudar estado — {company.name}</h3>
-      <p style={{ fontSize: 13, color: 'var(--ink-muted)', marginTop: -8 }}>
-        Estado atual: {STATUS_LABELS[company.status] ?? company.status}
-      </p>
-      {error && <div className="error-banner">{error}</div>}
-      <div className="field">
-        <label>Novo estado</label>
-        <select value={status} onChange={(e) => setStatus(e.target.value)}>
-          {Object.entries(STATUS_LABELS).map(([code, label]) => (
-            <option key={code} value={code}>
-              {label}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div className="field">
-        <label>
-          Motivo {REASON_REQUIRED.has(status) ? '(obrigatório para este estado)' : '(opcional)'}
-        </label>
-        <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Ex: pagamento em atraso há 30 dias" />
-      </div>
-      <div style={{ display: 'flex', gap: 8 }}>
-        <button className="btn" type="submit" disabled={submitting}>
-          {submitting ? 'Salvando...' : 'Confirmar mudança'}
-        </button>
-        <button type="button" className="logout-btn" style={{ color: 'var(--ink-muted)', borderColor: 'var(--border)' }} onClick={onCancel}>
-          Cancelar
-        </button>
-      </div>
-    </form>
   );
 }
 

@@ -5,11 +5,22 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import * as argon2 from 'argon2';
+import * as crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../common/audit-log.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { RequestUser } from '../auth/types';
+
+const USER_LIST_SELECT = {
+  id: true,
+  name: true,
+  email: true,
+  active: true,
+  lastLoginAt: true,
+  createdAt: true,
+  roles: { select: { role: { select: { code: true, name: true } } } },
+} as const;
 
 @Injectable()
 export class UsersService {
@@ -60,15 +71,7 @@ export class UsersService {
     }
     return this.prisma.user.findMany({
       where: { companyId: actor.companyId },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        active: true,
-        lastLoginAt: true,
-        createdAt: true,
-        roles: { select: { role: { select: { code: true, name: true } } } },
-      },
+      select: USER_LIST_SELECT,
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -92,6 +95,80 @@ export class UsersService {
     });
 
     return updated;
+  }
+
+  // ---------- Suporte: Super Admin agindo sobre usuários de QUALQUER empresa ----------
+  // Métodos separados de propósito (não reaproveitam findAndAssertSameCompany) — aqui
+  // o "dono" da ação é a plataforma, não a própria empresa, então o controller já
+  // restringe isso a quem tem platform.manage antes mesmo de chegar aqui.
+
+  async findAllForCompany(companyId: string) {
+    return this.prisma.user.findMany({
+      where: { companyId },
+      select: USER_LIST_SELECT,
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async setActiveForSupport(companyId: string, userId: string, active: boolean, actor: RequestUser) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user || user.companyId !== companyId) {
+      throw new NotFoundException('Usuário não encontrado nesta empresa.');
+    }
+
+    const updated = await this.prisma.user.update({
+      where: { id: userId },
+      data: { active },
+      select: { id: true, name: true, email: true, active: true },
+    });
+
+    // Desativar alguém não pode deixar sessões antigas ainda válidas rodando.
+    if (!active) {
+      await this.prisma.refreshToken.updateMany({
+        where: { userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+    }
+
+    await this.auditLog.record({
+      action: active ? 'user.support_reactivate' : 'user.support_deactivate',
+      userId: actor.id,
+      companyId,
+      entityType: 'User',
+      entityId: userId,
+    });
+
+    return updated;
+  }
+
+  /** Gera uma senha temporária, devolve em texto puro só nesta resposta (nunca fica em log). */
+  async resetPasswordForSupport(companyId: string, userId: string, actor: RequestUser) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user || user.companyId !== companyId) {
+      throw new NotFoundException('Usuário não encontrado nesta empresa.');
+    }
+
+    const tempPassword = crypto.randomBytes(9).toString('base64url'); // ~12 caracteres, url-safe
+    const passwordHash = await argon2.hash(tempPassword);
+
+    await this.prisma.$transaction([
+      this.prisma.user.update({ where: { id: userId }, data: { passwordHash } }),
+      this.prisma.refreshToken.updateMany({
+        where: { userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      }),
+    ]);
+
+    await this.auditLog.record({
+      action: 'user.support_password_reset',
+      userId: actor.id,
+      companyId,
+      entityType: 'User',
+      entityId: userId,
+      // nunca a senha em si — só o fato de que foi resetada
+    });
+
+    return { tempPassword };
   }
 
   private async findAndAssertSameCompany(id: string, actor: RequestUser) {

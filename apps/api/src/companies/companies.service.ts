@@ -170,6 +170,25 @@ export class CompaniesService {
     });
   }
 
+  /** Números de consumo pra página de detalhe — só contagens leves, nada de listar tudo. */
+  async getSummary(id: string, actor: RequestUser) {
+    this.assertCanAccess(id, actor);
+    const company = await this.prisma.company.findUnique({ where: { id } });
+    if (!company) {
+      throw new NotFoundException('Empresa não encontrada.');
+    }
+
+    const [users, vehicles, customers, contracts, activeContracts] = await Promise.all([
+      this.prisma.user.count({ where: { companyId: id } }),
+      this.prisma.vehicle.count({ where: { companyId: id } }),
+      this.prisma.customer.count({ where: { companyId: id } }),
+      this.prisma.contract.count({ where: { companyId: id } }),
+      this.prisma.contract.count({ where: { companyId: id, status: 'active' } }),
+    ]);
+
+    return { company, consumption: { users, vehicles, customers, contracts, activeContracts } };
+  }
+
   async saveLogo(id: string, file: Express.Multer.File, actor: RequestUser) {
     this.assertCanAccess(id, actor);
 
