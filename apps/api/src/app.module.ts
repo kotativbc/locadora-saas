@@ -22,6 +22,7 @@ import { TrackingModule } from './tracking/tracking.module';
 import { FinanceModule } from './finance/finance.module';
 import { AuditModule } from './audit/audit.module';
 import { PlansModule } from './plans/plans.module';
+import { BackupsModule } from './backups/backups.module';
 import { HealthController } from './common/health.controller';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { PermissionsGuard } from './rbac/permissions.guard';
@@ -50,6 +51,7 @@ import { PermissionsGuard } from './rbac/permissions.guard';
     FinesModule,
     TrackingModule,
     AuditModule,
+    BackupsModule,
   ],
   controllers: [HealthController],
   providers: [
