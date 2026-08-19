@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { api, ApiError } from '../api';
+import { EmptyState } from '../components/EmptyState';
 
 interface UserRow {
   id: string;
@@ -58,6 +59,8 @@ export function Users() {
 
         {loading ? (
           <p>Carregando...</p>
+        ) : users.length === 0 ? (
+          <EmptyState title="Nenhum usuário além de você" body="Cadastre a equipe pra dar acesso à plataforma com o papel certo pra cada um." />
         ) : (
           <table>
             <thead>

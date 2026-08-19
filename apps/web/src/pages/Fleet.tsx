@@ -1,5 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { api, ApiError } from '../api';
+import { StatusSelect, type StatusOption } from '../components/StatusSelect';
+import { EmptyState } from '../components/EmptyState';
 
 interface Vehicle {
   id: string;
@@ -12,12 +14,12 @@ interface Vehicle {
   createdAt: string;
 }
 
-const STATUS_LABELS: Record<string, string> = {
-  available: 'Disponível',
-  rented: 'Locado',
-  maintenance: 'Manutenção',
-  inactive: 'Inativo',
-};
+const STATUS_OPTIONS: StatusOption[] = [
+  { value: 'available', label: 'Disponível', variant: 'success' },
+  { value: 'rented', label: 'Locado', variant: 'info' },
+  { value: 'maintenance', label: 'Manutenção', variant: 'warning' },
+  { value: 'inactive', label: 'Inativo', variant: 'neutral' },
+];
 
 export function Fleet() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
@@ -78,6 +80,8 @@ export function Fleet() {
 
         {loading ? (
           <p>Carregando...</p>
+        ) : vehicles.length === 0 ? (
+          <EmptyState title="Nenhum veículo cadastrado" body="Cadastre o primeiro veículo pra começar a montar sua frota." />
         ) : (
           <table>
             <thead>
@@ -100,18 +104,12 @@ export function Fleet() {
                   </td>
                   <td>{v.category}</td>
                   <td>
-                    <select
+                    <StatusSelect
                       value={v.status}
+                      options={STATUS_OPTIONS}
                       disabled={savingId === v.id}
-                      onChange={(e) => handleStatusChange(v.id, e.target.value)}
-                      style={{ padding: '4px 6px', borderRadius: 6, border: '1px solid var(--border)' }}
-                    >
-                      {Object.entries(STATUS_LABELS).map(([code, label]) => (
-                        <option key={code} value={code}>
-                          {label}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(status) => handleStatusChange(v.id, status)}
+                    />
                   </td>
                   <td>{v.odometerKm.toLocaleString('pt-BR')} km</td>
                 </tr>

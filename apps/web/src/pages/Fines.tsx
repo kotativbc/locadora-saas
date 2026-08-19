@@ -1,5 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { api, ApiError } from '../api';
+import { StatusSelect, type StatusOption } from '../components/StatusSelect';
+import { EmptyState } from '../components/EmptyState';
 
 interface Vehicle {
   id: string;
@@ -18,11 +20,11 @@ interface Fine {
   vehicle: { plate: string; brand: string; model: string };
 }
 
-const STATUS_LABELS: Record<string, string> = {
-  pending: 'Pendente',
-  paid: 'Paga',
-  contested: 'Contestada',
-};
+const STATUS_OPTIONS: StatusOption[] = [
+  { value: 'pending', label: 'Pendente', variant: 'warning' },
+  { value: 'paid', label: 'Paga', variant: 'success' },
+  { value: 'contested', label: 'Contestada', variant: 'danger' },
+];
 
 function formatCurrency(value: string) {
   return Number(value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -84,6 +86,8 @@ export function Fines() {
 
         {loading ? (
           <p>Carregando...</p>
+        ) : fines.length === 0 ? (
+          <EmptyState title="Nenhuma multa registrada" body="Multas de trânsito recebidas pelos veículos aparecem aqui." />
         ) : (
           <table>
             <thead>
@@ -107,18 +111,12 @@ export function Fines() {
                   <td>{formatCurrency(f.amount)}</td>
                   <td>{f.chargeToCustomer ? 'Sim' : 'Não'}</td>
                   <td>
-                    <select
+                    <StatusSelect
                       value={f.status}
+                      options={STATUS_OPTIONS}
                       disabled={savingId === f.id}
-                      onChange={(e) => handleStatusChange(f.id, e.target.value)}
-                      style={{ padding: '4px 6px', borderRadius: 6, border: '1px solid var(--border)' }}
-                    >
-                      {Object.entries(STATUS_LABELS).map(([code, label]) => (
-                        <option key={code} value={code}>
-                          {label}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(status) => handleStatusChange(f.id, status)}
+                    />
                   </td>
                 </tr>
               ))}

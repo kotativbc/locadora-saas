@@ -59,3 +59,24 @@ literal com o assunto.
   poderiam ganhar agrupamento em etapas)
 - Considerar modo escuro — os tokens já são variáveis CSS, então é
   tecnicamente simples adicionar depois sem retrabalho
+
+## Parte 2 — concluída
+
+- **`StatusSelect`**: os 4 `<select>` de status editável (Frota, Sinistros,
+  Multas, Lançamentos) agora têm a mesma linguagem visual dos badges —
+  pílula colorida com seta, mantendo 100% a interatividade
+- **`EmptyState`**: aplicado em 8 telas (Clientes, Tarifas, Contratos,
+  Manutenção, Avarias, Usuários, Empresas, Despesas) — cada uma com texto
+  específico do que fazer a seguir, não um "nenhum resultado" genérico
+- **Formulário de Novo Contrato** — o mais longo do sistema — agrupado em
+  3 seções visuais (Cliente e veículo / Tarifa / Período)
+- Bug de CSS pego antes de mandar: `:first-of-type` conta por tag HTML,
+  não por classe — trocado por `.field-group + .field-group` (seletor de
+  irmão adjacente), senão o traço divisório saía errado quando havia um
+  aviso de erro antes do primeiro grupo
+
+## Ainda em aberto (fica pra uma Parte 3, se fizer sentido depois)
+
+- Modo escuro (tokens já preparados via CSS vars)
+- Ilustração/ícone nos estados vazios (hoje é só texto)
+- Onboarding/tour guiado pra novos usuários da equipe

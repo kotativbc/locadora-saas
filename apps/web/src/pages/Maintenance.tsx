@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { api, ApiError } from '../api';
+import { EmptyState } from '../components/EmptyState';
 
 interface Vehicle {
   id: string;
@@ -74,6 +75,8 @@ export function Maintenance() {
 
         {loading ? (
           <p>Carregando...</p>
+        ) : records.length === 0 ? (
+          <EmptyState title="Nenhuma manutenção registrada" body="Registre trocas de óleo, revisões e reparos aqui pra manter o histórico da frota." />
         ) : (
           <table>
             <thead>

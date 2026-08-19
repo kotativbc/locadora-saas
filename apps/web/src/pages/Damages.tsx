@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { api, ApiError } from '../api';
 import { StatusBadge } from '../components/StatusBadge';
+import { EmptyState } from '../components/EmptyState';
 
 interface Vehicle {
   id: string;
@@ -86,6 +87,8 @@ export function Damages() {
 
         {loading ? (
           <p>Carregando...</p>
+        ) : damages.length === 0 ? (
+          <EmptyState title="Nenhuma avaria registrada" body="Avarias encontradas em vistorias ou registradas avulsas aparecem aqui." />
         ) : (
           <table>
             <thead>

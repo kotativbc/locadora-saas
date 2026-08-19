@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { api, ApiError, fetchFileUrl, copyToClipboard } from '../api';
 import { StatusBadge, type BadgeVariant } from '../components/StatusBadge';
+import { EmptyState } from '../components/EmptyState';
 
 interface Customer {
   id: string;
@@ -172,6 +173,8 @@ export function Contracts() {
 
         {loading ? (
           <p>Carregando...</p>
+        ) : contracts.length === 0 ? (
+          <EmptyState title="Nenhum contrato ainda" body="Crie um contrato depois de cadastrar cliente, veículo e tarifa." />
         ) : (
           <table>
             <thead>
@@ -325,59 +328,72 @@ function NewContractForm({
     <form className="card" onSubmit={handleSubmit}>
       <h3 style={{ marginTop: 0 }}>Novo contrato</h3>
       {error && <div className="error-banner">{error}</div>}
-      <div className="field">
-        <label>Cliente</label>
-        <select value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
-          {customers.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name} — {c.document}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div className="field">
-        <label>Veículo</label>
-        <select value={vehicleId} onChange={(e) => setVehicleId(e.target.value)}>
-          {vehicles.map((v) => (
-            <option key={v.id} value={v.id}>
-              {v.plate} — {v.brand} {v.model}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div className="field">
-        <label>Tarifa</label>
-        <select value={rateMode} onChange={(e) => setRateMode(e.target.value as 'plan' | 'manual')}>
-          {ratePlans.length > 0 && <option value="plan">Usar tarifa cadastrada</option>}
-          <option value="manual">Diária avulsa</option>
-        </select>
-      </div>
-      {rateMode === 'plan' ? (
+
+      <div className="field-group">
+        <div className="field-group__label">Cliente e veículo</div>
         <div className="field">
-          <label>Plano de tarifa</label>
-          <select value={ratePlanId} onChange={(e) => setRatePlanId(e.target.value)}>
-            {ratePlans.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.name} — {formatCurrency(r.dailyRate)}/dia
+          <label>Cliente</label>
+          <select value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
+            {customers.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name} — {c.document}
               </option>
             ))}
           </select>
         </div>
-      ) : (
-        <div className="field">
-          <label>Diária (R$)</label>
-          <input required type="number" step="0.01" min="0" value={dailyRate} onChange={(e) => setDailyRate(e.target.value)} />
+        <div className="field" style={{ marginBottom: 0 }}>
+          <label>Veículo</label>
+          <select value={vehicleId} onChange={(e) => setVehicleId(e.target.value)}>
+            {vehicles.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.plate} — {v.brand} {v.model}
+              </option>
+            ))}
+          </select>
         </div>
-      )}
-      <div className="field">
-        <label>Data de retirada</label>
-        <input required type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
       </div>
-      <div className="field">
-        <label>Data de devolução prevista</label>
-        <input required type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+
+      <div className="field-group">
+        <div className="field-group__label">Tarifa</div>
+        <div className="field">
+          <label>Como cobrar</label>
+          <select value={rateMode} onChange={(e) => setRateMode(e.target.value as 'plan' | 'manual')}>
+            {ratePlans.length > 0 && <option value="plan">Usar tarifa cadastrada</option>}
+            <option value="manual">Diária avulsa</option>
+          </select>
+        </div>
+        {rateMode === 'plan' ? (
+          <div className="field" style={{ marginBottom: 0 }}>
+            <label>Plano de tarifa</label>
+            <select value={ratePlanId} onChange={(e) => setRatePlanId(e.target.value)}>
+              {ratePlans.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name} — {formatCurrency(r.dailyRate)}/dia
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : (
+          <div className="field" style={{ marginBottom: 0 }}>
+            <label>Diária (R$)</label>
+            <input required type="number" step="0.01" min="0" value={dailyRate} onChange={(e) => setDailyRate(e.target.value)} />
+          </div>
+        )}
       </div>
-      <button className="btn" type="submit" disabled={submitting}>
+
+      <div className="field-group">
+        <div className="field-group__label">Período</div>
+        <div className="field">
+          <label>Data de retirada</label>
+          <input required type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+        </div>
+        <div className="field" style={{ marginBottom: 0 }}>
+          <label>Data de devolução prevista</label>
+          <input required type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+        </div>
+      </div>
+
+      <button className="btn" type="submit" disabled={submitting} style={{ marginTop: 4 }}>
         {submitting ? 'Criando...' : 'Criar contrato (rascunho)'}
       </button>
     </form>

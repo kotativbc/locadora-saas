@@ -331,6 +331,24 @@ a {
   color: var(--rtv-ink-600);
 }
 
+.field-group {
+  margin-bottom: 16px;
+}
+
+.field-group + .field-group {
+  padding-top: 14px;
+  border-top: 1px dashed var(--rtv-line);
+}
+
+.field-group__label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--rtv-ink-400);
+  margin-bottom: 10px;
+}
+
 .field input,
 .field select {
   padding: 9px 11px;
@@ -354,6 +372,59 @@ select {
   padding: 6px 9px;
   background: var(--rtv-surface);
   color: var(--rtv-ink-900);
+}
+
+/* ---------- Select de status (interativo, mesma linguagem do badge) ---------- */
+
+.status-select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 4px 26px 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 11px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M3 4.5L6 7.5L9 4.5' stroke='%234B5568' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  transition: filter 0.1s ease;
+}
+
+.status-select:hover {
+  filter: brightness(0.96);
+}
+
+.status-select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.status-select--success {
+  background-color: var(--rtv-success-bg);
+  color: var(--rtv-success);
+}
+
+.status-select--warning {
+  background-color: var(--rtv-warning-bg);
+  color: var(--rtv-warning);
+}
+
+.status-select--danger {
+  background-color: var(--rtv-danger-bg);
+  color: var(--rtv-danger);
+}
+
+.status-select--info {
+  background-color: var(--rtv-info-bg);
+  color: var(--rtv-info);
+}
+
+.status-select--neutral {
+  background-color: #eef0f4;
+  color: var(--rtv-ink-600);
 }
 
 /* ---------- Botões ---------- */

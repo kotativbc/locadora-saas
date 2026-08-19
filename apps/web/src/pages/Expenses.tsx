@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { api, ApiError } from '../api';
+import { EmptyState } from '../components/EmptyState';
 
 interface Vehicle {
   id: string;
@@ -71,6 +72,8 @@ export function Expenses() {
 
         {loading ? (
           <p>Carregando...</p>
+        ) : expenses.length === 0 ? (
+          <EmptyState title="Nenhuma despesa registrada" body="Registre manutenção, combustível, seguro e outros custos aqui." />
         ) : (
           <table>
             <thead>

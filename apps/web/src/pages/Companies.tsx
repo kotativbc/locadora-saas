@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { api, ApiError } from '../api';
+import { EmptyState } from '../components/EmptyState';
 
 interface Company {
   id: string;
@@ -50,6 +51,8 @@ export function Companies() {
 
         {loading ? (
           <p>Carregando...</p>
+        ) : companies.length === 0 ? (
+          <EmptyState title="Nenhuma empresa cadastrada" body="Cadastre a primeira empresa locadora pra começar a usar a plataforma." />
         ) : (
           <table>
             <thead>

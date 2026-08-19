@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { api, ApiError } from '../api';
+import { EmptyState } from '../components/EmptyState';
 
 interface Customer {
   id: string;
@@ -52,6 +53,8 @@ export function Customers() {
 
         {loading ? (
           <p>Carregando...</p>
+        ) : customers.length === 0 ? (
+          <EmptyState title="Nenhum cliente cadastrado" body="Cadastre o primeiro cliente pra começar a criar contratos." />
         ) : (
           <table>
             <thead>
