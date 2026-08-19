@@ -212,7 +212,7 @@ function NewFineForm({ vehicles, onCreated }: { vehicles: Vehicle[]; onCreated: 
         Cobrar do cliente
       </label>
       <p style={{ fontSize: 12, color: 'var(--ink-muted)', marginTop: 0, marginBottom: 14 }}>
-        Marca a intenção — o lançamento financeiro em si vem na Fase 5.
+        Se marcado, já cria um lançamento em Financeiro → Lançamentos.
       </p>
       <button className="btn" type="submit" disabled={submitting}>
         {submitting ? 'Salvando...' : 'Registrar multa'}

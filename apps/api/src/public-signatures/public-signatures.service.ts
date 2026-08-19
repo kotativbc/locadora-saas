@@ -3,6 +3,7 @@ import * as crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../common/audit-log.service';
 import { ContractsService } from '../contracts/contracts.service';
+import { ChargeGeneratorService } from '../finance/charge-generator.service';
 
 function daysBetween(start: Date, end: Date): number {
   const ms = end.getTime() - start.getTime();
@@ -15,6 +16,7 @@ export class PublicSignaturesService {
     private readonly prisma: PrismaService,
     private readonly auditLog: AuditLogService,
     private readonly contractsService: ContractsService,
+    private readonly chargeGenerator: ChargeGeneratorService,
   ) {}
 
   private async findValidSignature(token: string) {
@@ -92,6 +94,17 @@ export class PublicSignaturesService {
       entityId: c.id,
       metadata: { termsHash, ip },
       ip,
+    });
+
+    // Lançamento financeiro do aluguel — nasce automaticamente na assinatura.
+    await this.chargeGenerator.createAutoCharge({
+      companyId: c.companyId,
+      customerId: c.customerId,
+      contractId: c.id,
+      type: 'rental',
+      description: `Locação — contrato ${c.id.slice(0, 8)}`,
+      amount: c.totalValue.toString(),
+      dueDate: c.endDate,
     });
 
     return { signedAt, termsHash };

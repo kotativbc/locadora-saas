@@ -1,6 +1,7 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../common/audit-log.service';
+import { ChargeGeneratorService } from '../finance/charge-generator.service';
 import { CreateFineDto } from './dto/create-fine.dto';
 import { UpdateFineDto } from './dto/update-fine.dto';
 import { RequestUser } from '../auth/types';
@@ -10,6 +11,7 @@ export class FinesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditLog: AuditLogService,
+    private readonly chargeGenerator: ChargeGeneratorService,
   ) {}
 
   async create(dto: CreateFineDto, actor: RequestUser) {
@@ -20,6 +22,15 @@ export class FinesService {
     const vehicle = await this.prisma.vehicle.findUnique({ where: { id: dto.vehicleId } });
     if (!vehicle || vehicle.companyId !== actor.companyId) {
       throw new NotFoundException('Veículo não encontrado nesta empresa.');
+    }
+
+    let contractCustomerId: string | undefined;
+    if (dto.contractId) {
+      const contract = await this.prisma.contract.findUnique({ where: { id: dto.contractId } });
+      if (!contract || contract.companyId !== actor.companyId) {
+        throw new NotFoundException('Contrato não encontrado nesta empresa.');
+      }
+      contractCustomerId = contract.customerId;
     }
 
     const fine = await this.prisma.fine.create({
@@ -44,6 +55,18 @@ export class FinesService {
       entityType: 'Fine',
       entityId: fine.id,
     });
+
+    if (dto.chargeToCustomer) {
+      await this.chargeGenerator.createAutoCharge({
+        companyId: actor.companyId,
+        customerId: contractCustomerId,
+        contractId: dto.contractId,
+        type: 'fine',
+        description: `Multa — ${dto.description}`,
+        amount: dto.amount,
+        dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
+      });
+    }
 
     return fine;
   }

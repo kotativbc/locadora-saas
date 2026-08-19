@@ -84,6 +84,21 @@ export function Layout() {
               Tarifas
             </NavLink>
           )}
+          {hasPermission('finance.manage') && (
+            <NavLink to="/financeiro" className={({ isActive }) => `sidebar__link${isActive ? ' active' : ''}`}>
+              Financeiro
+            </NavLink>
+          )}
+          {hasPermission('finance.manage') && (
+            <NavLink to="/despesas" className={({ isActive }) => `sidebar__link${isActive ? ' active' : ''}`}>
+              Despesas
+            </NavLink>
+          )}
+          {hasPermission('reports.view') && (
+            <NavLink to="/relatorios" className={({ isActive }) => `sidebar__link${isActive ? ' active' : ''}`}>
+              Relatórios
+            </NavLink>
+          )}
           {hasPermission('users.manage') && (
             <NavLink to="/usuarios" className={({ isActive }) => `sidebar__link${isActive ? ' active' : ''}`}>
               Usuários

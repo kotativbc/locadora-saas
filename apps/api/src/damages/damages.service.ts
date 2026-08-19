@@ -1,6 +1,7 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../common/audit-log.service';
+import { ChargeGeneratorService } from '../finance/charge-generator.service';
 import { CreateDamageDto } from './dto/create-damage.dto';
 import { UpdateDamageDto } from './dto/update-damage.dto';
 import { RequestUser } from '../auth/types';
@@ -10,6 +11,7 @@ export class DamagesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditLog: AuditLogService,
+    private readonly chargeGenerator: ChargeGeneratorService,
   ) {}
 
   async create(dto: CreateDamageDto, actor: RequestUser) {
@@ -20,6 +22,15 @@ export class DamagesService {
     const vehicle = await this.prisma.vehicle.findUnique({ where: { id: dto.vehicleId } });
     if (!vehicle || vehicle.companyId !== actor.companyId) {
       throw new NotFoundException('Veículo não encontrado nesta empresa.');
+    }
+
+    let contractCustomerId: string | undefined;
+    if (dto.contractId) {
+      const contract = await this.prisma.contract.findUnique({ where: { id: dto.contractId } });
+      if (!contract || contract.companyId !== actor.companyId) {
+        throw new NotFoundException('Contrato não encontrado nesta empresa.');
+      }
+      contractCustomerId = contract.customerId;
     }
 
     const damage = await this.prisma.damage.create({
@@ -42,6 +53,18 @@ export class DamagesService {
       entityType: 'Damage',
       entityId: damage.id,
     });
+
+    // Se marcada "cobrar do cliente" e tem custo estimado, já nasce o lançamento.
+    if (dto.chargeToCustomer && dto.estimatedCost) {
+      await this.chargeGenerator.createAutoCharge({
+        companyId: actor.companyId,
+        customerId: contractCustomerId,
+        contractId: dto.contractId,
+        type: 'damage',
+        description: `Avaria — ${dto.description}`,
+        amount: dto.estimatedCost,
+      });
+    }
 
     return damage;
   }

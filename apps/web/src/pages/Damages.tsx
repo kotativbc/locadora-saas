@@ -205,8 +205,7 @@ function NewDamageForm({ vehicles, onCreated }: { vehicles: Vehicle[]; onCreated
         Cobrar do cliente
       </label>
       <p style={{ fontSize: 12, color: 'var(--ink-muted)', marginTop: 0, marginBottom: 14 }}>
-        Por enquanto isso só marca a intenção de cobrança — ainda não existe módulo
-        financeiro pra gerar a cobrança de verdade (vem na Fase 5).
+        Se marcado e houver custo estimado, já cria um lançamento em Financeiro → Lançamentos.
       </p>
       <button className="btn" type="submit" disabled={submitting}>
         {submitting ? 'Salvando...' : 'Registrar avaria'}

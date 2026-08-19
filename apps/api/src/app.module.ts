@@ -19,6 +19,7 @@ import { MaintenanceModule } from './maintenance/maintenance.module';
 import { ClaimsModule } from './claims/claims.module';
 import { FinesModule } from './fines/fines.module';
 import { TrackingModule } from './tracking/tracking.module';
+import { FinanceModule } from './finance/finance.module';
 import { HealthController } from './common/health.controller';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { PermissionsGuard } from './rbac/permissions.guard';
@@ -29,6 +30,7 @@ import { PermissionsGuard } from './rbac/permissions.guard';
     CommonModule,
     PrismaModule,
     DocumentsModule,
+    FinanceModule,
     AuthModule,
     RbacModule,
     CompaniesModule,

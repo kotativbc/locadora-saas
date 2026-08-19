@@ -17,6 +17,9 @@ import { Damages } from './pages/Damages';
 import { Claims } from './pages/Claims';
 import { Fines } from './pages/Fines';
 import { Tracking } from './pages/Tracking';
+import { Finance } from './pages/Finance';
+import { Expenses } from './pages/Expenses';
+import { Reports } from './pages/Reports';
 
 export function App() {
   return (
@@ -40,6 +43,9 @@ export function App() {
               <Route path="/sinistros" element={<Claims />} />
               <Route path="/multas" element={<Fines />} />
               <Route path="/rastreamento" element={<Tracking />} />
+              <Route path="/financeiro" element={<Finance />} />
+              <Route path="/despesas" element={<Expenses />} />
+              <Route path="/relatorios" element={<Reports />} />
             </Route>
           </Route>
         </Routes>
