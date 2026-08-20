@@ -21,6 +21,10 @@ interface RatePlan {
   id: string;
   name: string;
   dailyRate: string;
+  monthlyRate: string | null;
+  kmAllowancePerMonth: number | null;
+  extraKmRate: string | null;
+  cautionAmount: string | null;
 }
 
 interface Contract {
@@ -285,6 +289,8 @@ function NewContractForm({
 }) {
   const [customerId, setCustomerId] = useState(customers[0]?.id ?? '');
   const [vehicleId, setVehicleId] = useState(vehicles[0]?.id ?? '');
+  const [templateType, setTemplateType] = useState<'standard' | 'monthly_app_driver'>('standard');
+  const monthlyPlans = ratePlans.filter((r) => r.monthlyRate);
   const [rateMode, setRateMode] = useState<'plan' | 'manual'>(ratePlans.length ? 'plan' : 'manual');
   const [ratePlanId, setRatePlanId] = useState(ratePlans[0]?.id ?? '');
   const [dailyRate, setDailyRate] = useState('');
@@ -292,6 +298,16 @@ function NewContractForm({
   const [endDate, setEndDate] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const selectedMonthlyPlan = monthlyPlans.find((r) => r.id === ratePlanId);
+
+  function handleTemplateTypeChange(value: 'standard' | 'monthly_app_driver') {
+    setTemplateType(value);
+    if (value === 'monthly_app_driver') {
+      setRateMode('plan');
+      setRatePlanId(monthlyPlans[0]?.id ?? '');
+    }
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -301,8 +317,9 @@ function NewContractForm({
       await api.post('/contracts', {
         customerId,
         vehicleId,
-        ratePlanId: rateMode === 'plan' ? ratePlanId : undefined,
-        dailyRate: rateMode === 'manual' ? dailyRate : undefined,
+        templateType,
+        ratePlanId: templateType === 'monthly_app_driver' || rateMode === 'plan' ? ratePlanId : undefined,
+        dailyRate: templateType === 'standard' && rateMode === 'manual' ? dailyRate : undefined,
         startDate: new Date(startDate).toISOString(),
         endDate: new Date(endDate).toISOString(),
       });
@@ -330,6 +347,16 @@ function NewContractForm({
       {error && <div className="error-banner">{error}</div>}
 
       <div className="field-group">
+        <div className="field-group__label">Tipo de contrato</div>
+        <div className="field" style={{ marginBottom: 0 }}>
+          <select value={templateType} onChange={(e) => handleTemplateTypeChange(e.target.value as typeof templateType)}>
+            <option value="standard">Padrão (diária/semanal/mensal)</option>
+            <option value="monthly_app_driver">Motorista de aplicativo (mensal, com caução e KM controlado)</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="field-group">
         <div className="field-group__label">Cliente e veículo</div>
         <div className="field">
           <label>Cliente</label>
@@ -353,33 +380,65 @@ function NewContractForm({
         </div>
       </div>
 
-      <div className="field-group">
-        <div className="field-group__label">Tarifa</div>
-        <div className="field">
-          <label>Como cobrar</label>
-          <select value={rateMode} onChange={(e) => setRateMode(e.target.value as 'plan' | 'manual')}>
-            {ratePlans.length > 0 && <option value="plan">Usar tarifa cadastrada</option>}
-            <option value="manual">Diária avulsa</option>
-          </select>
+      {templateType === 'monthly_app_driver' ? (
+        <div className="field-group">
+          <div className="field-group__label">Tarifa (motorista de aplicativo)</div>
+          {monthlyPlans.length === 0 ? (
+            <p style={{ fontSize: 13, color: 'var(--rtv-danger)', marginTop: 0 }}>
+              Nenhuma tarifa com valor mensal cadastrada. Vá em Tarifas e cadastre uma com valor mensal, limite de
+              KM e caução antes de criar este tipo de contrato.
+            </p>
+          ) : (
+            <>
+              <div className="field" style={{ marginBottom: 0 }}>
+                <label>Plano de tarifa</label>
+                <select value={ratePlanId} onChange={(e) => setRatePlanId(e.target.value)}>
+                  {monthlyPlans.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.name} — {formatCurrency(r.monthlyRate!)}/mês
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {selectedMonthlyPlan && (
+                <p style={{ fontSize: 12, color: 'var(--ink-muted)', marginTop: 10, marginBottom: 0 }}>
+                  Limite de KM: {selectedMonthlyPlan.kmAllowancePerMonth ?? 'não definido'} km/mês · KM excedente:{' '}
+                  {selectedMonthlyPlan.extraKmRate ? formatCurrency(selectedMonthlyPlan.extraKmRate) : 'não definido'}{' '}
+                  · Caução: {selectedMonthlyPlan.cautionAmount ? formatCurrency(selectedMonthlyPlan.cautionAmount) : 'não definida'}
+                </p>
+              )}
+            </>
+          )}
         </div>
-        {rateMode === 'plan' ? (
-          <div className="field" style={{ marginBottom: 0 }}>
-            <label>Plano de tarifa</label>
-            <select value={ratePlanId} onChange={(e) => setRatePlanId(e.target.value)}>
-              {ratePlans.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.name} — {formatCurrency(r.dailyRate)}/dia
-                </option>
-              ))}
+      ) : (
+        <div className="field-group">
+          <div className="field-group__label">Tarifa</div>
+          <div className="field">
+            <label>Como cobrar</label>
+            <select value={rateMode} onChange={(e) => setRateMode(e.target.value as 'plan' | 'manual')}>
+              {ratePlans.length > 0 && <option value="plan">Usar tarifa cadastrada</option>}
+              <option value="manual">Diária avulsa</option>
             </select>
           </div>
-        ) : (
-          <div className="field" style={{ marginBottom: 0 }}>
-            <label>Diária (R$)</label>
-            <input required type="number" step="0.01" min="0" value={dailyRate} onChange={(e) => setDailyRate(e.target.value)} />
-          </div>
-        )}
-      </div>
+          {rateMode === 'plan' ? (
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>Plano de tarifa</label>
+              <select value={ratePlanId} onChange={(e) => setRatePlanId(e.target.value)}>
+                {ratePlans.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name} — {formatCurrency(r.dailyRate)}/dia
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>Diária (R$)</label>
+              <input required type="number" step="0.01" min="0" value={dailyRate} onChange={(e) => setDailyRate(e.target.value)} />
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="field-group">
         <div className="field-group__label">Período</div>
@@ -388,12 +447,17 @@ function NewContractForm({
           <input required type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
         </div>
         <div className="field" style={{ marginBottom: 0 }}>
-          <label>Data de devolução prevista</label>
+          <label>Data de devolução prevista{templateType === 'monthly_app_driver' ? ' (fim do ciclo atual)' : ''}</label>
           <input required type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
         </div>
       </div>
 
-      <button className="btn" type="submit" disabled={submitting} style={{ marginTop: 4 }}>
+      <button
+        className="btn"
+        type="submit"
+        disabled={submitting || (templateType === 'monthly_app_driver' && monthlyPlans.length === 0)}
+        style={{ marginTop: 4 }}
+      >
         {submitting ? 'Criando...' : 'Criar contrato (rascunho)'}
       </button>
     </form>

@@ -73,20 +73,44 @@ export class ContractsService {
     }
 
     let dailyRate: string;
-    if (dto.ratePlanId) {
+    let totalValue: string;
+    let monthlyKmLimitSnapshot: number | undefined;
+    let extraKmRateSnapshot: string | undefined;
+    let cautionAmountSnapshot: string | undefined;
+    const templateType = dto.templateType ?? 'standard';
+    const days = daysBetween(startDate, endDate);
+
+    if (templateType === 'monthly_app_driver') {
+      // Modalidade mensal sempre usa tarifa cadastrada — precisa dos campos
+      // de KM/caução, que não existem numa diária avulsa.
+      if (!dto.ratePlanId) {
+        throw new BadRequestException('Contrato de motorista de aplicativo exige uma tarifa cadastrada com valor mensal.');
+      }
+      const ratePlan = await this.prisma.ratePlan.findUnique({ where: { id: dto.ratePlanId } });
+      if (!ratePlan || ratePlan.companyId !== actor.companyId) {
+        throw new NotFoundException('Tarifa não encontrada nesta empresa.');
+      }
+      if (!ratePlan.monthlyRate) {
+        throw new BadRequestException('Esta tarifa não tem valor mensal cadastrado — edite a tarifa antes de usar neste tipo de contrato.');
+      }
+      totalValue = ratePlan.monthlyRate.toString();
+      dailyRate = (Number(ratePlan.monthlyRate) / 30).toFixed(2); // equivalente só pra manter o campo preenchido
+      monthlyKmLimitSnapshot = ratePlan.kmAllowancePerMonth ?? undefined;
+      extraKmRateSnapshot = ratePlan.extraKmRate?.toString();
+      cautionAmountSnapshot = ratePlan.cautionAmount?.toString();
+    } else if (dto.ratePlanId) {
       const ratePlan = await this.prisma.ratePlan.findUnique({ where: { id: dto.ratePlanId } });
       if (!ratePlan || ratePlan.companyId !== actor.companyId) {
         throw new NotFoundException('Tarifa não encontrada nesta empresa.');
       }
       dailyRate = ratePlan.dailyRate.toString();
+      totalValue = (Number(dailyRate) * days).toFixed(2);
     } else if (dto.dailyRate) {
       dailyRate = dto.dailyRate;
+      totalValue = (Number(dailyRate) * days).toFixed(2);
     } else {
       throw new BadRequestException('Informe uma tarifa cadastrada ou uma diária avulsa.');
     }
-
-    const days = daysBetween(startDate, endDate);
-    const totalValue = (Number(dailyRate) * days).toFixed(2);
 
     const contract = await this.prisma.contract.create({
       data: {
@@ -94,10 +118,14 @@ export class ContractsService {
         customerId: dto.customerId,
         vehicleId: dto.vehicleId,
         ratePlanId: dto.ratePlanId,
+        templateType,
         startDate,
         endDate,
         dailyRateSnapshot: dailyRate,
         totalValue,
+        monthlyKmLimitSnapshot,
+        extraKmRateSnapshot,
+        cautionAmountSnapshot,
         status: 'draft',
         createdByUserId: actor.id,
       },
@@ -171,6 +199,86 @@ export class ContractsService {
       where: { id: contractId },
       include: { company: true, customer: true, vehicle: true, signature: true },
     });
+
+    if (contract.templateType === 'monthly_app_driver') {
+      const [deliveryInspection, returnInspection] = await Promise.all([
+        this.prisma.inspection.findFirst({ where: { contractId, type: 'delivery' }, orderBy: { performedAt: 'desc' } }),
+        this.prisma.inspection.findFirst({ where: { contractId, type: 'return' }, orderBy: { performedAt: 'desc' } }),
+      ]);
+
+      return this.pdfService.renderMonthlyDriverContract({
+        contractId: contract.id,
+        company: {
+          name: contract.company.name,
+          tradeName: contract.company.tradeName,
+          cnpj: contract.company.cnpj,
+          addressStreet: contract.company.addressStreet,
+          addressNumber: contract.company.addressNumber,
+          addressComplement: contract.company.addressComplement,
+          addressNeighborhood: contract.company.addressNeighborhood,
+          addressCity: contract.company.addressCity,
+          addressState: contract.company.addressState,
+          addressZipCode: contract.company.addressZipCode,
+        },
+        customer: {
+          name: contract.customer.name,
+          document: contract.customer.document,
+          documentType: contract.customer.documentType,
+          driverLicenseNumber: contract.customer.driverLicenseNumber,
+          driverLicenseCategory: contract.customer.driverLicenseCategory,
+          address: contract.customer.address,
+          email: contract.customer.email,
+          phone: contract.customer.phone,
+          bankName: contract.customer.bankName,
+          bankAgency: contract.customer.bankAgency,
+          bankAccount: contract.customer.bankAccount,
+          pixKey: contract.customer.pixKey,
+        },
+        vehicle: {
+          plate: contract.vehicle.plate,
+          brand: contract.vehicle.brand,
+          model: contract.vehicle.model,
+          chassis: contract.vehicle.chassis,
+          fipeValue: contract.vehicle.fipeValue?.toString() ?? null,
+          maintenanceIntervalKm: contract.vehicle.maintenanceIntervalKm,
+        },
+        contract: {
+          startDate: contract.startDate,
+          endDate: contract.endDate,
+          monthlyRate: contract.totalValue.toString(),
+          monthlyKmLimit: contract.monthlyKmLimitSnapshot,
+          extraKmRate: contract.extraKmRateSnapshot?.toString() ?? null,
+          cautionAmount: contract.cautionAmountSnapshot?.toString() ?? null,
+          createdAt: contract.createdAt,
+        },
+        signature:
+          contract.signature?.signedAt && contract.signature.termsHash
+            ? {
+                signedAt: contract.signature.signedAt,
+                signerIp: contract.signature.signerIp,
+                termsHash: contract.signature.termsHash,
+              }
+            : null,
+        inspections: {
+          delivery: deliveryInspection
+            ? {
+                performedAt: deliveryInspection.performedAt,
+                odometerKm: deliveryInspection.odometerKm,
+                fuelLevel: deliveryInspection.fuelLevel,
+                exteriorNotes: deliveryInspection.exteriorNotes,
+              }
+            : null,
+          return: returnInspection
+            ? {
+                performedAt: returnInspection.performedAt,
+                odometerKm: returnInspection.odometerKm,
+                fuelLevel: returnInspection.fuelLevel,
+                exteriorNotes: returnInspection.exteriorNotes,
+              }
+            : null,
+        },
+      });
+    }
 
     return this.pdfService.render({
       company: {

@@ -54,9 +54,22 @@ Inteiramente coberto pelo módulo de Vistorias que já existe desde a Fase 3
 encontradas; `Document`: fotos). Não precisa de nenhum dado novo — só
 formatar em PDF o que já é coletado na entrega/devolução.
 
-## O que ainda falta (Parte B)
+## Parte B — concluída
 
-Os 5 documentos em si — texto jurídico completo, renderizado com
-`@react-pdf/renderer`, puxando automaticamente os campos acima a partir da
-empresa/cliente/veículo/contrato selecionados. Essa parte ainda não foi
-implementada.
+Os 5 documentos completos, implementados em
+`monthly-driver-contract-pdf.template.tsx`, gerados num único PDF (8
+páginas): contrato principal (8 cláusulas) + Anexo I (vistoria, puxa dados
+reais de entrega/devolução quando já registrados, senão mostra campos em
+branco pra preencher à mão) + Anexo II (caução, com os dados bancários do
+cliente) + Anexo III (procuração) + Anexo IV (manutenção preventiva, com o
+cálculo automático de 10% da FIPE quando o veículo tem valor cadastrado).
+
+Testado no sandbox com `pdftotext`/`pdfinfo` antes de empacotar — não só
+"compilou", conferi o texto extraído de verdade, os 4 `\f` (quebra de
+página) entre os documentos, e os dois cenários (com e sem vistoria/
+assinatura preenchidas).
+
+Formulário de Novo Contrato ganhou o seletor "Tipo de contrato" — ao
+escolher "Motorista de aplicativo", só mostra tarifas com valor mensal
+cadastrado, e exibe o resumo do limite de KM/caução/KM excedente que vai
+valer nesse contrato específico.
