@@ -101,6 +101,7 @@ model User {
   roles         UserRole[]
   refreshTokens RefreshToken[]
   auditLogs     AuditLog[]
+  passwordResets PasswordReset[]
 
   @@index([companyId])
   @@map("users")
@@ -162,6 +163,21 @@ model RefreshToken {
 
   @@index([userId])
   @@map("refresh_tokens")
+}
+
+/// Link de redefinição de senha ("esqueci minha senha") — token guardado com
+/// hash (mesmo padrão do refresh token), uso único, expira em 1h.
+model PasswordReset {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@map("password_resets")
 }
 
 /// Trilha de auditoria — toda ação sensível (login, criação de empresa, mudança de permissão etc.) gera um registro.

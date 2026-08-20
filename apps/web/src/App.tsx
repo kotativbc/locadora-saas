@@ -3,6 +3,8 @@ import { AuthProvider } from './auth/AuthContext';
 import { RequireAuth } from './components/RequireAuth';
 import { Layout } from './components/Layout';
 import { Login } from './pages/Login';
+import { ForgotPassword } from './pages/ForgotPassword';
+import { ResetPassword } from './pages/ResetPassword';
 import { Home } from './pages/Home';
 import { Companies } from './pages/Companies';
 import { CompanyDetail } from './pages/CompanyDetail';
@@ -32,6 +34,8 @@ export function App() {
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/esqueci-minha-senha" element={<ForgotPassword />} />
+          <Route path="/redefinir-senha/:token" element={<ResetPassword />} />
           <Route path="/assinar/:token" element={<PublicSign />} />
           <Route element={<RequireAuth />}>
             <Route element={<Layout />}>

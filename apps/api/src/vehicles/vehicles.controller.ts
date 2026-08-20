@@ -3,7 +3,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { VehiclesService } from './vehicles.service';
 import { CreateVehicleDto } from './dto/create-vehicle.dto';
 import { UpdateVehicleDto } from './dto/update-vehicle.dto';
-import { DocumentsService } from '../documents/documents.service';
+import { DocumentsService, MAX_DOCUMENT_BYTES } from '../documents/documents.service';
 import { RequirePermissions } from '../rbac/permissions.decorator';
 import { PermissionCode } from '../rbac/rbac.constants';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -43,7 +43,7 @@ export class VehiclesController {
   }
 
   @Post(':id/documents')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_DOCUMENT_BYTES } }))
   async uploadDocument(
     @Param('id') id: string,
     @Body('label') label: string,

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { RbacModule } from './rbac/rbac.module';
@@ -23,6 +24,7 @@ import { FinanceModule } from './finance/finance.module';
 import { AuditModule } from './audit/audit.module';
 import { PlansModule } from './plans/plans.module';
 import { BackupsModule } from './backups/backups.module';
+import { EmailModule } from './email/email.module';
 import { HealthController } from './common/health.controller';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { ImpersonationReadOnlyGuard } from './auth/impersonation-read-only.guard';
@@ -31,8 +33,14 @@ import { PermissionsGuard } from './rbac/permissions.guard';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    // Limite padrão: 100 req/min por IP — generoso pro uso normal (uma SPA
+    // faz várias chamadas por navegação), mas barra abuso. Rotas sensíveis
+    // (login, esqueci senha) têm limite mais apertado via @Throttle() no
+    // controller — ver auth.controller.ts.
+    ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 100 }]),
     CommonModule,
     PrismaModule,
+    EmailModule,
     DocumentsModule,
     FinanceModule,
     PlansModule,
@@ -56,7 +64,10 @@ import { PermissionsGuard } from './rbac/permissions.guard';
   ],
   controllers: [HealthController],
   providers: [
-    // Ordem importa: autentica → bloqueia escrita se for sessão de suporte → checa permissão.
+    // Ordem importa: rate limit primeiro (barra abuso antes de gastar
+    // esforço checando token) → autentica → bloqueia escrita se for sessão
+    // de suporte → checa permissão.
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: ImpersonationReadOnlyGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },

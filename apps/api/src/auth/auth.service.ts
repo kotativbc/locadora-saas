@@ -1,10 +1,11 @@
-import { ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as argon2 from 'argon2';
 import * as crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../common/audit-log.service';
+import { EMAIL_ADAPTER, EmailAdapter } from '../email/email-adapter.interface';
 import { JwtPayload, RequestUser } from './types';
 import { PermissionCode } from '../rbac/rbac.constants';
 import { BLOCKING_COMPANY_STATUSES, COMPANY_STATUS_LABELS, CompanyStatus } from '../companies/company-status.constants';
@@ -12,6 +13,7 @@ import { BLOCKING_COMPANY_STATUSES, COMPANY_STATUS_LABELS, CompanyStatus } from 
 const ACCESS_TOKEN_TTL = '15m';
 const REFRESH_TOKEN_TTL_DAYS = 7;
 const IMPERSONATION_TTL_MINUTES = 10;
+const PASSWORD_RESET_TTL_MINUTES = 60;
 
 // Permissões concedidas numa sessão de suporte: dá visibilidade completa da
 // empresa (mesmo nível de um Admin da Empresa), mas o ImpersonationReadOnlyGuard
@@ -36,6 +38,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly auditLog: AuditLogService,
+    @Inject(EMAIL_ADAPTER) private readonly emailAdapter: EmailAdapter,
   ) {}
 
   async login(email: string, password: string, ip?: string) {
@@ -190,6 +193,70 @@ export class AuthService {
     });
 
     return { accessToken, companyName: company.name, expiresAt: expiresAt.toISOString() };
+  }
+
+  /**
+   * Sempre responde com sucesso genérico, exista ou não o e-mail — evita
+   * enumeration (alguém descobrir quais e-mails têm conta só testando aqui).
+   * Se SMTP não estiver configurado, o LogEmailAdapter registra no log e o
+   * fluxo segue normal (nunca quebra por falta de e-mail configurado).
+   */
+  async forgotPassword(email: string): Promise<void> {
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (!user || !user.active) {
+      return;
+    }
+
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = this.hashToken(rawToken);
+    const expiresAt = new Date(Date.now() + PASSWORD_RESET_TTL_MINUTES * 60 * 1000);
+
+    await this.prisma.passwordReset.create({ data: { userId: user.id, tokenHash, expiresAt } });
+
+    const appUrl = this.configService.get<string>('PUBLIC_APP_URL') ?? '';
+    const resetUrl = `${appUrl}/redefinir-senha/${rawToken}`;
+
+    await this.emailAdapter.send({
+      to: user.email,
+      subject: 'Redefinição de senha — Rentovix',
+      text: `Recebemos um pedido para redefinir sua senha na Rentovix.\n\nAcesse o link abaixo pra criar uma nova senha (válido por 1 hora):\n${resetUrl}\n\nSe você não pediu isso, pode ignorar este e-mail — sua senha continua a mesma.`,
+      html: `<p>Recebemos um pedido para redefinir sua senha na Rentovix.</p><p><a href="${resetUrl}">Clique aqui para criar uma nova senha</a> (link válido por 1 hora).</p><p>Se você não pediu isso, pode ignorar este e-mail — sua senha continua a mesma.</p>`,
+    });
+
+    await this.auditLog.record({
+      action: 'auth.password_reset_requested',
+      userId: user.id,
+      companyId: user.companyId,
+    });
+  }
+
+  async resetPassword(rawToken: string, newPassword: string): Promise<void> {
+    const tokenHash = this.hashToken(rawToken);
+    const reset = await this.prisma.passwordReset.findUnique({ where: { tokenHash } });
+
+    if (!reset || reset.usedAt || reset.expiresAt < new Date()) {
+      throw new BadRequestException('Link de redefinição inválido ou expirado. Peça um novo link.');
+    }
+
+    const passwordHash = await argon2.hash(newPassword);
+
+    await this.prisma.$transaction([
+      this.prisma.user.update({ where: { id: reset.userId }, data: { passwordHash } }),
+      this.prisma.passwordReset.update({ where: { id: reset.id }, data: { usedAt: new Date() } }),
+      // Redefinir a senha derruba todas as sessões ativas — se alguém mais
+      // tinha acesso indevido, perde o acesso na hora.
+      this.prisma.refreshToken.updateMany({
+        where: { userId: reset.userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      }),
+    ]);
+
+    const user = await this.prisma.user.findUnique({ where: { id: reset.userId } });
+    await this.auditLog.record({
+      action: 'auth.password_reset_completed',
+      userId: reset.userId,
+      companyId: user?.companyId,
+    });
   }
 
   /** Usuário de plataforma (sem empresa, ex: Super Admin) não passa por essa checagem. */

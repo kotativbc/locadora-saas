@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { ApiError } from '../api';
 import { BrandMark } from '../components/BrandMark';
@@ -62,6 +62,12 @@ export function Login() {
         <button className="btn" type="submit" disabled={submitting} style={{ width: '100%' }}>
           {submitting ? 'Entrando...' : 'Entrar'}
         </button>
+        <Link
+          to="/esqueci-minha-senha"
+          style={{ display: 'block', textAlign: 'center', marginTop: 14, fontSize: 12.5, color: 'var(--rtv-teal-600)' }}
+        >
+          Esqueci minha senha
+        </Link>
       </form>
     </div>
   );

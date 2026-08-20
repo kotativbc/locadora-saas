@@ -7,7 +7,7 @@ import { AuditLogService } from '../common/audit-log.service';
 import { ownerDocumentsDir, UPLOADS_ROOT } from '../common/storage';
 import { RequestUser } from '../auth/types';
 
-const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024; // 10MB
+export const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024; // 10MB — exportado pra ser usado também no limite do Multer (FileInterceptor) nos controllers, não só nesta checagem tardia
 const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'application/pdf']);
 
 export type DocumentOwnerType = 'CUSTOMER' | 'VEHICLE' | 'INSPECTION' | 'CLAIM';
