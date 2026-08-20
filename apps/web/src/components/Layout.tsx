@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
   Building2,
   Car,
@@ -18,15 +18,28 @@ import {
   History,
   Layers,
   DatabaseBackup,
+  Eye,
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { BrandMark } from './BrandMark';
 
 export function Layout() {
-  const { user, logout, hasPermission } = useAuth();
+  const { user, logout, hasPermission, impersonating, exitImpersonation } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [exiting, setExiting] = useState(false);
+  const navigate = useNavigate();
 
   const linkClass = ({ isActive }: { isActive: boolean }) => `sidebar__link${isActive ? ' active' : ''}`;
+
+  async function handleExitImpersonation() {
+    setExiting(true);
+    try {
+      await exitImpersonation();
+      navigate('/');
+    } finally {
+      setExiting(false);
+    }
+  }
 
   return (
     <div className="app-shell">
@@ -185,6 +198,18 @@ export function Layout() {
         </div>
       </aside>
       <main className="main">
+        {impersonating && (
+          <div className="impersonation-banner">
+            <Eye size={16} />
+            <span>
+              Modo suporte — visualizando <strong>{impersonating.companyName}</strong> — somente leitura — expira às{' '}
+              {new Date(impersonating.expiresAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+            </span>
+            <button className="impersonation-banner__exit" disabled={exiting} onClick={handleExitImpersonation}>
+              {exiting ? 'Saindo...' : 'Sair do modo suporte'}
+            </button>
+          </div>
+        )}
         <Outlet />
       </main>
     </div>

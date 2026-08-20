@@ -25,6 +25,7 @@ import { PlansModule } from './plans/plans.module';
 import { BackupsModule } from './backups/backups.module';
 import { HealthController } from './common/health.controller';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
+import { ImpersonationReadOnlyGuard } from './auth/impersonation-read-only.guard';
 import { PermissionsGuard } from './rbac/permissions.guard';
 
 @Module({
@@ -55,8 +56,9 @@ import { PermissionsGuard } from './rbac/permissions.guard';
   ],
   controllers: [HealthController],
   providers: [
-    // Ordem importa: primeiro autentica (popula req.user), depois checa permissão.
+    // Ordem importa: autentica → bloqueia escrita se for sessão de suporte → checa permissão.
     { provide: APP_GUARD, useClass: JwtAuthGuard },
+    { provide: APP_GUARD, useClass: ImpersonationReadOnlyGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
   ],
 })

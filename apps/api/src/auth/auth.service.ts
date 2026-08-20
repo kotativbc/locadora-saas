@@ -1,16 +1,33 @@
-import { ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as argon2 from 'argon2';
 import * as crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../common/audit-log.service';
-import { JwtPayload } from './types';
+import { JwtPayload, RequestUser } from './types';
 import { PermissionCode } from '../rbac/rbac.constants';
 import { BLOCKING_COMPANY_STATUSES, COMPANY_STATUS_LABELS, CompanyStatus } from '../companies/company-status.constants';
 
 const ACCESS_TOKEN_TTL = '15m';
 const REFRESH_TOKEN_TTL_DAYS = 7;
+const IMPERSONATION_TTL_MINUTES = 10;
+
+// Permissões concedidas numa sessão de suporte: dá visibilidade completa da
+// empresa (mesmo nível de um Admin da Empresa), mas o ImpersonationReadOnlyGuard
+// bloqueia qualquer escrita antes mesmo de chegar na checagem de permissão.
+const IMPERSONATION_PERMISSIONS: PermissionCode[] = [
+  PermissionCode.COMPANIES_MANAGE,
+  PermissionCode.USERS_MANAGE,
+  PermissionCode.FLEET_MANAGE,
+  PermissionCode.CUSTOMERS_MANAGE,
+  PermissionCode.RATES_MANAGE,
+  PermissionCode.RESERVATIONS_MANAGE,
+  PermissionCode.CONTRACTS_MANAGE,
+  PermissionCode.FINANCE_MANAGE,
+  PermissionCode.REPORTS_VIEW,
+  PermissionCode.AUDIT_VIEW,
+];
 
 @Injectable()
 export class AuthService {
@@ -134,6 +151,45 @@ export class AuthService {
       where: { tokenHash, revokedAt: null },
       data: { revokedAt: new Date() },
     });
+  }
+
+  /**
+   * Sessão de suporte do Super Admin ("entrar como"). Não gera refresh token
+   * — é um token curto (10min) e, se expirar, quem quiser continuar clica
+   * de novo. `sub` continua sendo o Super Admin real (é ele quem aparece
+   * como autor em qualquer tentativa de escrita bloqueada e na auditoria),
+   * só o `companyId` muda pra o da empresa visualizada.
+   */
+  async createImpersonationSession(companyId: string, actor: RequestUser, ip?: string) {
+    const company = await this.prisma.company.findUnique({ where: { id: companyId } });
+    if (!company) {
+      throw new NotFoundException('Empresa não encontrada.');
+    }
+
+    const payload: JwtPayload = {
+      sub: actor.id,
+      name: actor.name,
+      email: actor.email,
+      companyId,
+      roles: ['SUPPORT_VIEW'],
+      permissions: IMPERSONATION_PERMISSIONS,
+      impersonation: true,
+    };
+
+    const accessToken = this.jwtService.sign(payload, { expiresIn: `${IMPERSONATION_TTL_MINUTES}m` });
+    const expiresAt = new Date(Date.now() + IMPERSONATION_TTL_MINUTES * 60 * 1000);
+
+    await this.auditLog.record({
+      action: 'company.impersonation_started',
+      userId: actor.id,
+      companyId,
+      entityType: 'Company',
+      entityId: companyId,
+      metadata: { ttlMinutes: IMPERSONATION_TTL_MINUTES },
+      ip,
+    });
+
+    return { accessToken, companyName: company.name, expiresAt: expiresAt.toISOString() };
   }
 
   /** Usuário de plataforma (sem empresa, ex: Super Admin) não passa por essa checagem. */

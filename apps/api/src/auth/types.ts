@@ -8,6 +8,7 @@ export interface JwtPayload {
   companyId: string | null;
   roles: string[];
   permissions: PermissionCode[];
+  impersonation?: boolean; // sessão de suporte do Super Admin — somente leitura, bloqueado no guard
 }
 
 export interface RequestUser {
@@ -17,6 +18,7 @@ export interface RequestUser {
   companyId: string | null;
   roles: string[];
   permissions: PermissionCode[];
+  impersonation?: boolean;
 }
 
 export interface AuthenticatedRequest extends Request {

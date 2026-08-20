@@ -638,6 +638,44 @@ th.num {
   margin: 0 auto;
 }
 
+/* ---------- Banner de sessão de suporte (impersonation) ---------- */
+
+.impersonation-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--rtv-warning-bg);
+  color: var(--rtv-warning);
+  border: 1px solid rgba(201, 130, 27, 0.3);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.impersonation-banner strong {
+  color: inherit;
+}
+
+.impersonation-banner__exit {
+  margin-left: auto;
+  background: var(--rtv-warning);
+  color: #fff;
+  border: none;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.impersonation-banner__exit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 /* ---------- Login / assinatura pública ---------- */
 
 .login-screen {

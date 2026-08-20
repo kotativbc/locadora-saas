@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Ip,
   Param,
   Patch,
   Post,
@@ -18,6 +19,7 @@ import { ChangeCompanyStatusDto } from './dto/change-company-status.dto';
 import { SetUserActiveDto } from './dto/set-user-active.dto';
 import { SetCompanyPlanDto } from './dto/set-company-plan.dto';
 import { UsersService } from '../users/users.service';
+import { AuthService } from '../auth/auth.service';
 import { RequirePermissions } from '../rbac/permissions.decorator';
 import { PermissionCode } from '../rbac/rbac.constants';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -30,6 +32,7 @@ export class CompaniesController {
   constructor(
     private readonly companiesService: CompaniesService,
     private readonly usersService: UsersService,
+    private readonly authService: AuthService,
   ) {}
 
   @Post()
@@ -88,6 +91,18 @@ export class CompaniesController {
   @RequirePermissions(PermissionCode.PLATFORM_MANAGE)
   setPlan(@Param('id') id: string, @Body() dto: SetCompanyPlanDto, @CurrentUser() actor: RequestUser) {
     return this.companiesService.setPlan(id, dto.planId, actor);
+  }
+
+  /**
+   * Só Super Admin — gera uma sessão de suporte "somente leitura" pra essa
+   * empresa (sem precisar da senha de ninguém). Token curto (10min), sem
+   * refresh — o ImpersonationReadOnlyGuard bloqueia qualquer escrita nele
+   * globalmente, não é uma promessa da tela.
+   */
+  @Post(':id/impersonate')
+  @RequirePermissions(PermissionCode.PLATFORM_MANAGE)
+  impersonate(@Param('id') id: string, @CurrentUser() actor: RequestUser, @Ip() ip: string) {
+    return this.authService.createImpersonationSession(id, actor, ip);
   }
 
   // ---------- Suporte: Super Admin agindo sobre usuários de qualquer empresa ----------

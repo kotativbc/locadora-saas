@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { ArrowLeft, Eye } from 'lucide-react';
 import { api, ApiError } from '../api';
 import { EmptyState } from '../components/EmptyState';
 import { StatusBadge } from '../components/StatusBadge';
 import { ChangeCompanyStatusForm, COMPANY_STATUS_LABELS, COMPANY_STATUS_VARIANT } from '../components/CompanyStatusControls';
+import { useAuth } from '../auth/AuthContext';
 
 interface Plan {
   id: string;
@@ -57,6 +58,9 @@ interface SupportUser {
 
 export function CompanyDetail() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const { startImpersonation } = useAuth();
+  const [enteringSupport, setEnteringSupport] = useState(false);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [history, setHistory] = useState<StatusEvent[]>([]);
   const [users, setUsers] = useState<SupportUser[]>([]);
@@ -140,6 +144,20 @@ export function CompanyDetail() {
     }
   }
 
+  async function handleEnterSupportMode() {
+    if (!id) return;
+    setEnteringSupport(true);
+    setError(null);
+    try {
+      await startImpersonation(id);
+      navigate('/');
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erro ao entrar em modo suporte.');
+    } finally {
+      setEnteringSupport(false);
+    }
+  }
+
   if (loading) {
     return <p>Carregando...</p>;
   }
@@ -174,9 +192,19 @@ export function CompanyDetail() {
             {company.statusReason && <span style={{ fontSize: 12, color: 'var(--rtv-ink-400)' }}>{company.statusReason}</span>}
           </div>
         </div>
-        <button className="btn btn--accent" onClick={() => setStatusFormOpen((v) => !v)}>
-          {statusFormOpen ? 'Cancelar' : 'Mudar estado'}
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            className="logout-btn"
+            style={{ color: 'var(--rtv-navy-900)', borderColor: 'var(--rtv-line-strong)', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+            disabled={enteringSupport}
+            onClick={handleEnterSupportMode}
+          >
+            <Eye size={14} /> {enteringSupport ? 'Entrando...' : 'Entrar como (somente leitura)'}
+          </button>
+          <button className="btn btn--accent" onClick={() => setStatusFormOpen((v) => !v)}>
+            {statusFormOpen ? 'Cancelar' : 'Mudar estado'}
+          </button>
+        </div>
       </div>
 
       {error && <div className="error-banner">{error}</div>}

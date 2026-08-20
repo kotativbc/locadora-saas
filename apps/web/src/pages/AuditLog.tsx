@@ -47,6 +47,14 @@ const ACTION_LABELS: Record<string, string> = {
   'charge.auto_created': 'Lançamento automático',
   'charge.update': 'Lançamento atualizado',
   'expense.create': 'Despesa registrada',
+  'company.status_change': 'Estado da empresa alterado',
+  'company.plan_change': 'Plano da empresa alterado',
+  'company.impersonation_started': 'Modo suporte iniciado',
+  'user.support_deactivate': 'Usuário desativado (suporte)',
+  'user.support_reactivate': 'Usuário reativado (suporte)',
+  'user.support_password_reset': 'Senha redefinida (suporte)',
+  'plan.create': 'Plano criado',
+  'plan.update': 'Plano atualizado',
 };
 
 export function AuditLog() {
