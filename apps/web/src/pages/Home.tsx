@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Car, Users, FileText, BarChart3, Building2, History } from 'lucide-react';
+import { Car, Users, FileText, BarChart3, Building2, History, TrendingUp } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { api, ApiError } from '../api';
 
@@ -22,6 +22,7 @@ function formatCurrency(value: string) {
 
 const QUICK_ACTIONS: { to: string; label: string; icon: typeof Car; permission: string }[] = [
   { to: '/empresas', label: 'Ver empresas', icon: Building2, permission: 'platform.manage' },
+  { to: '/crescimento', label: 'Ver crescimento', icon: TrendingUp, permission: 'platform.manage' },
   { to: '/frota', label: 'Ver frota', icon: Car, permission: 'fleet.manage' },
   { to: '/clientes', label: 'Ver clientes', icon: Users, permission: 'customers.manage' },
   { to: '/contratos', label: 'Ver contratos', icon: FileText, permission: 'contracts.manage' },

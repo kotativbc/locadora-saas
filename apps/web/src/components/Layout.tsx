@@ -19,6 +19,7 @@ import {
   Layers,
   DatabaseBackup,
   Eye,
+  TrendingUp,
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { BrandMark } from './BrandMark';
@@ -80,6 +81,9 @@ export function Layout() {
               </NavLink>
               <NavLink to="/backups" className={linkClass}>
                 <DatabaseBackup /> Backups
+              </NavLink>
+              <NavLink to="/crescimento" className={linkClass}>
+                <TrendingUp /> Crescimento
               </NavLink>
               {hasPermission('audit.view') && (
                 <NavLink to="/auditoria" className={linkClass}>

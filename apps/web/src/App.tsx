@@ -8,6 +8,7 @@ import { Companies } from './pages/Companies';
 import { CompanyDetail } from './pages/CompanyDetail';
 import { Plans } from './pages/Plans';
 import { Backups } from './pages/Backups';
+import { PlatformGrowthReport } from './pages/PlatformGrowthReport';
 import { MyCompany } from './pages/MyCompany';
 import { Users } from './pages/Users';
 import { Fleet } from './pages/Fleet';
@@ -39,6 +40,7 @@ export function App() {
               <Route path="/empresas/:id" element={<CompanyDetail />} />
               <Route path="/planos" element={<Plans />} />
               <Route path="/backups" element={<Backups />} />
+              <Route path="/crescimento" element={<PlatformGrowthReport />} />
               <Route path="/minha-empresa" element={<MyCompany />} />
               <Route path="/usuarios" element={<Users />} />
               <Route path="/frota" element={<Fleet />} />

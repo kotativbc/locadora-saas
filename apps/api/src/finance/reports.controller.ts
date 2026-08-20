@@ -14,4 +14,11 @@ export class ReportsController {
   getFinancialSummary(@CurrentUser() actor: RequestUser) {
     return this.reportsService.getFinancialSummary(actor);
   }
+
+  /** Só Super Admin — sobrescreve a permissão da classe (REPORTS_VIEW), que o Super Admin não tem. */
+  @Get('platform-growth')
+  @RequirePermissions(PermissionCode.PLATFORM_MANAGE)
+  getPlatformGrowth() {
+    return this.reportsService.getPlatformGrowth();
+  }
 }
