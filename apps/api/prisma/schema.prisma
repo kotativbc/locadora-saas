@@ -21,6 +21,17 @@ model Company {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  // Endereço — usado no cabeçalho dos contratos e como Foro (cidade/estado)
+  // nas cláusulas de eleição de foro. Tudo opcional pra não travar quem já
+  // tem empresa cadastrada sem esses dados.
+  addressStreet       String?
+  addressNumber       String?
+  addressComplement   String?
+  addressNeighborhood String?
+  addressCity         String?
+  addressState        String? // sigla, ex: SP, MG
+  addressZipCode      String?
+
   users     User[]
   auditLogs AuditLog[]
   vehicles  Vehicle[]
@@ -206,6 +217,8 @@ model Vehicle {
   status          String   @default("available") // available | rented | maintenance | inactive
   odometerKm      Int      @default(0)
   fuelType        String? // flex, gasolina, diesel, eletrico, hibrido
+  fipeValue       Decimal? @db.Decimal(10, 2) // base pra multas indenizatórias calculadas em % da FIPE
+  maintenanceIntervalKm Int? // a cada quantos km pede revisão preventiva (padrão sugerido: 10000)
   notes           String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -241,6 +254,13 @@ model Customer {
   driverLicenseNumber    String?
   driverLicenseCategory  String?
   driverLicenseExpiry    DateTime?
+  // Dados bancários — usados só pra devolução de saldo de caução ao final da
+  // locação. Nunca usados pra cobrança (isso é sempre cartão/manual, fora do
+  // sistema); guardar aqui é só o destino de um possível reembolso.
+  bankName               String?
+  bankAgency             String?
+  bankAccount            String?
+  pixKey                 String?
   notes                  String?
   active                 Boolean   @default(true)
   createdAt              DateTime  @default(now())
@@ -298,7 +318,9 @@ model RatePlan {
   weeklyRate        Decimal? @db.Decimal(10, 2)
   monthlyRate       Decimal? @db.Decimal(10, 2)
   kmAllowancePerDay Int?
+  kmAllowancePerMonth Int? // limite mensal (modalidade motorista de app — diferente do limite diário acima)
   extraKmRate       Decimal? @db.Decimal(10, 2)
+  cautionAmount     Decimal? @db.Decimal(10, 2) // valor do depósito de caução, se este plano exigir
   active            Boolean  @default(true)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
@@ -320,10 +342,17 @@ model Contract {
   vehicle           Vehicle   @relation(fields: [vehicleId], references: [id])
   ratePlanId        String?
   ratePlan          RatePlan? @relation(fields: [ratePlanId], references: [id], onDelete: SetNull)
+  templateType      String    @default("standard") // standard | monthly_app_driver — qual modelo de PDF gerar
   startDate         DateTime
   endDate           DateTime
   dailyRateSnapshot Decimal   @db.Decimal(10, 2)
   totalValue        Decimal   @db.Decimal(10, 2)
+  // Snapshots da modalidade "motorista de app" — copiados do RatePlan no
+  // momento da criação, igual já fazemos com dailyRateSnapshot, pra o
+  // contrato não mudar de valor se a tarifa for editada depois.
+  monthlyKmLimitSnapshot Int?
+  extraKmRateSnapshot    Decimal? @db.Decimal(10, 2)
+  cautionAmountSnapshot  Decimal? @db.Decimal(10, 2)
   status            String    @default("draft") // draft | awaiting_signature | active | completed | cancelled
   deliveredAt       DateTime? // preenchido ao registrar a vistoria de entrega
   returnedAt        DateTime? // preenchido ao registrar a vistoria de devolução

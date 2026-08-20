@@ -92,7 +92,13 @@ function NewCustomerForm({ onCreated }: { onCreated: () => void }) {
   const [documentType, setDocumentType] = useState<'CPF' | 'CNPJ'>('CPF');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [address, setAddress] = useState('');
   const [driverLicenseNumber, setDriverLicenseNumber] = useState('');
+  const [driverLicenseCategory, setDriverLicenseCategory] = useState('');
+  const [bankName, setBankName] = useState('');
+  const [bankAgency, setBankAgency] = useState('');
+  const [bankAccount, setBankAccount] = useState('');
+  const [pixKey, setPixKey] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -107,7 +113,13 @@ function NewCustomerForm({ onCreated }: { onCreated: () => void }) {
         documentType,
         email: email || undefined,
         phone: phone || undefined,
+        address: address || undefined,
         driverLicenseNumber: driverLicenseNumber || undefined,
+        driverLicenseCategory: driverLicenseCategory || undefined,
+        bankName: bankName || undefined,
+        bankAgency: bankAgency || undefined,
+        bankAccount: bankAccount || undefined,
+        pixKey: pixKey || undefined,
       });
       onCreated();
     } catch (err) {
@@ -121,33 +133,70 @@ function NewCustomerForm({ onCreated }: { onCreated: () => void }) {
     <form className="card" onSubmit={handleSubmit}>
       <h3 style={{ marginTop: 0 }}>Novo cliente</h3>
       {error && <div className="error-banner">{error}</div>}
-      <div className="field">
-        <label>Nome completo</label>
-        <input required value={name} onChange={(e) => setName(e.target.value)} />
+
+      <div className="field-group">
+        <div className="field-group__label">Dados pessoais</div>
+        <div className="field">
+          <label>Nome completo</label>
+          <input required value={name} onChange={(e) => setName(e.target.value)} />
+        </div>
+        <div className="field">
+          <label>Tipo de documento</label>
+          <select value={documentType} onChange={(e) => setDocumentType(e.target.value as 'CPF' | 'CNPJ')}>
+            <option value="CPF">CPF</option>
+            <option value="CNPJ">CNPJ</option>
+          </select>
+        </div>
+        <div className="field">
+          <label>{documentType}</label>
+          <input required value={document} onChange={(e) => setDocument(e.target.value)} />
+        </div>
+        <div className="field">
+          <label>E-mail (opcional)</label>
+          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+        </div>
+        <div className="field">
+          <label>Telefone (opcional)</label>
+          <input value={phone} onChange={(e) => setPhone(e.target.value)} />
+        </div>
+        <div className="field" style={{ marginBottom: 0 }}>
+          <label>Endereço completo (opcional)</label>
+          <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Rua, número, bairro, cidade/UF" />
+        </div>
       </div>
-      <div className="field">
-        <label>Tipo de documento</label>
-        <select value={documentType} onChange={(e) => setDocumentType(e.target.value as 'CPF' | 'CNPJ')}>
-          <option value="CPF">CPF</option>
-          <option value="CNPJ">CNPJ</option>
-        </select>
+
+      <div className="field-group">
+        <div className="field-group__label">CNH (opcional — só necessário pra locação com condução, ex: motorista de app)</div>
+        <div className="field">
+          <label>Número da CNH</label>
+          <input value={driverLicenseNumber} onChange={(e) => setDriverLicenseNumber(e.target.value)} />
+        </div>
+        <div className="field" style={{ marginBottom: 0 }}>
+          <label>Categoria</label>
+          <input value={driverLicenseCategory} onChange={(e) => setDriverLicenseCategory(e.target.value)} placeholder="Ex: B, AB" />
+        </div>
       </div>
-      <div className="field">
-        <label>{documentType}</label>
-        <input required value={document} onChange={(e) => setDocument(e.target.value)} />
+
+      <div className="field-group">
+        <div className="field-group__label">Dados bancários (opcional — só usado pra devolver saldo de caução)</div>
+        <div className="field">
+          <label>Banco</label>
+          <input value={bankName} onChange={(e) => setBankName(e.target.value)} />
+        </div>
+        <div className="field">
+          <label>Agência</label>
+          <input value={bankAgency} onChange={(e) => setBankAgency(e.target.value)} />
+        </div>
+        <div className="field">
+          <label>Conta</label>
+          <input value={bankAccount} onChange={(e) => setBankAccount(e.target.value)} />
+        </div>
+        <div className="field" style={{ marginBottom: 0 }}>
+          <label>Chave PIX</label>
+          <input value={pixKey} onChange={(e) => setPixKey(e.target.value)} />
+        </div>
       </div>
-      <div className="field">
-        <label>E-mail (opcional)</label>
-        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-      </div>
-      <div className="field">
-        <label>Telefone (opcional)</label>
-        <input value={phone} onChange={(e) => setPhone(e.target.value)} />
-      </div>
-      <div className="field">
-        <label>Nº da CNH (opcional)</label>
-        <input value={driverLicenseNumber} onChange={(e) => setDriverLicenseNumber(e.target.value)} />
-      </div>
+
       <button className="btn" type="submit" disabled={submitting}>
         {submitting ? 'Cadastrando...' : 'Cadastrar cliente'}
       </button>

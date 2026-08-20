@@ -131,6 +131,9 @@ function NewVehicleForm({ onCreated }: { onCreated: () => void }) {
   const [category, setCategory] = useState('economico');
   const [color, setColor] = useState('');
   const [modelYear, setModelYear] = useState('');
+  const [chassis, setChassis] = useState('');
+  const [fipeValue, setFipeValue] = useState('');
+  const [maintenanceIntervalKm, setMaintenanceIntervalKm] = useState('10000');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -146,6 +149,9 @@ function NewVehicleForm({ onCreated }: { onCreated: () => void }) {
         category,
         color: color || undefined,
         modelYear: modelYear ? Number(modelYear) : undefined,
+        chassis: chassis || undefined,
+        fipeValue: fipeValue || undefined,
+        maintenanceIntervalKm: maintenanceIntervalKm ? Number(maintenanceIntervalKm) : undefined,
       });
       onCreated();
     } catch (err) {
@@ -159,35 +165,52 @@ function NewVehicleForm({ onCreated }: { onCreated: () => void }) {
     <form className="card" onSubmit={handleSubmit}>
       <h3 style={{ marginTop: 0 }}>Novo veículo</h3>
       {error && <div className="error-banner">{error}</div>}
-      <div className="field">
-        <label>Placa</label>
-        <input required value={plate} onChange={(e) => setPlate(e.target.value.toUpperCase())} />
+      <div className="field-group">
+        <div className="field">
+          <label>Placa</label>
+          <input required value={plate} onChange={(e) => setPlate(e.target.value.toUpperCase())} />
+        </div>
+        <div className="field">
+          <label>Marca</label>
+          <input required value={brand} onChange={(e) => setBrand(e.target.value)} />
+        </div>
+        <div className="field">
+          <label>Modelo</label>
+          <input required value={model} onChange={(e) => setModel(e.target.value)} />
+        </div>
+        <div className="field">
+          <label>Categoria</label>
+          <select value={category} onChange={(e) => setCategory(e.target.value)}>
+            <option value="economico">Econômico</option>
+            <option value="sedan">Sedan</option>
+            <option value="suv">SUV</option>
+            <option value="van">Van</option>
+            <option value="luxo">Luxo</option>
+          </select>
+        </div>
+        <div className="field">
+          <label>Cor (opcional)</label>
+          <input value={color} onChange={(e) => setColor(e.target.value)} />
+        </div>
+        <div className="field" style={{ marginBottom: 0 }}>
+          <label>Ano do modelo (opcional)</label>
+          <input type="number" value={modelYear} onChange={(e) => setModelYear(e.target.value)} />
+        </div>
       </div>
-      <div className="field">
-        <label>Marca</label>
-        <input required value={brand} onChange={(e) => setBrand(e.target.value)} />
-      </div>
-      <div className="field">
-        <label>Modelo</label>
-        <input required value={model} onChange={(e) => setModel(e.target.value)} />
-      </div>
-      <div className="field">
-        <label>Categoria</label>
-        <select value={category} onChange={(e) => setCategory(e.target.value)}>
-          <option value="economico">Econômico</option>
-          <option value="sedan">Sedan</option>
-          <option value="suv">SUV</option>
-          <option value="van">Van</option>
-          <option value="luxo">Luxo</option>
-        </select>
-      </div>
-      <div className="field">
-        <label>Cor (opcional)</label>
-        <input value={color} onChange={(e) => setColor(e.target.value)} />
-      </div>
-      <div className="field">
-        <label>Ano do modelo (opcional)</label>
-        <input type="number" value={modelYear} onChange={(e) => setModelYear(e.target.value)} />
+      <div className="field-group">
+        <div className="field-group__label">Pra contratos (opcional, preencha se for usar modelos de contrato mais completos)</div>
+        <div className="field">
+          <label>Chassi</label>
+          <input value={chassis} onChange={(e) => setChassis(e.target.value)} />
+        </div>
+        <div className="field">
+          <label>Valor Tabela FIPE (R$)</label>
+          <input type="number" step="0.01" min="0" value={fipeValue} onChange={(e) => setFipeValue(e.target.value)} />
+        </div>
+        <div className="field" style={{ marginBottom: 0 }}>
+          <label>Intervalo de manutenção (km)</label>
+          <input type="number" min="1000" value={maintenanceIntervalKm} onChange={(e) => setMaintenanceIntervalKm(e.target.value)} />
+        </div>
       </div>
       <button className="btn" type="submit" disabled={submitting}>
         {submitting ? 'Cadastrando...' : 'Cadastrar veículo'}

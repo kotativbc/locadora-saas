@@ -43,5 +43,21 @@ export class CreateCustomerDto {
 
   @IsOptional()
   @IsString()
+  bankName?: string;
+
+  @IsOptional()
+  @IsString()
+  bankAgency?: string;
+
+  @IsOptional()
+  @IsString()
+  bankAccount?: string;
+
+  @IsOptional()
+  @IsString()
+  pixKey?: string;
+
+  @IsOptional()
+  @IsString()
   notes?: string;
 }

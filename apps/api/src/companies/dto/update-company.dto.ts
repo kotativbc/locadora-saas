@@ -13,4 +13,32 @@ export class UpdateCompanyDto {
   @IsOptional()
   @IsString()
   cnpj?: string;
+
+  @IsOptional()
+  @IsString()
+  addressStreet?: string;
+
+  @IsOptional()
+  @IsString()
+  addressNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  addressComplement?: string;
+
+  @IsOptional()
+  @IsString()
+  addressNeighborhood?: string;
+
+  @IsOptional()
+  @IsString()
+  addressCity?: string;
+
+  @IsOptional()
+  @IsString()
+  addressState?: string;
+
+  @IsOptional()
+  @IsString()
+  addressZipCode?: string;
 }

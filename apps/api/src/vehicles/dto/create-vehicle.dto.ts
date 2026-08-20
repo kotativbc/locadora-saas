@@ -1,4 +1,4 @@
-import { IsIn, IsInt, IsOptional, IsString, Max, Min, MinLength } from 'class-validator';
+import { IsIn, IsInt, IsNumberString, IsOptional, IsString, Max, Min, MinLength } from 'class-validator';
 
 const FUEL_TYPES = ['flex', 'gasolina', 'diesel', 'eletrico', 'hibrido'] as const;
 
@@ -51,6 +51,15 @@ export class CreateVehicleDto {
   @IsInt()
   @Min(0)
   odometerKm?: number;
+
+  @IsOptional()
+  @IsNumberString()
+  fipeValue?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1000)
+  maintenanceIntervalKm?: number;
 
   @IsOptional()
   @IsString()

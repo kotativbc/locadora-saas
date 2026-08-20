@@ -30,6 +30,15 @@ export class CreateRatePlanDto {
   kmAllowancePerDay?: number;
 
   @IsOptional()
+  @IsInt()
+  @Min(0)
+  kmAllowancePerMonth?: number;
+
+  @IsOptional()
   @IsNumberString()
   extraKmRate?: string;
+
+  @IsOptional()
+  @IsNumberString()
+  cautionAmount?: string;
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState, type ChangeEvent } from 'react';
+import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
 import { api, ApiError, fetchFileUrl } from '../api';
 import { useAuth } from '../auth/AuthContext';
 
@@ -9,6 +9,13 @@ interface Company {
   cnpj: string | null;
   logoPath: string | null;
   status: string;
+  addressStreet: string | null;
+  addressNumber: string | null;
+  addressComplement: string | null;
+  addressNeighborhood: string | null;
+  addressCity: string | null;
+  addressState: string | null;
+  addressZipCode: string | null;
 }
 
 export function MyCompany() {
@@ -119,6 +126,93 @@ export function MyCompany() {
           <input type="file" accept="image/*" onChange={handleLogoChange} disabled={uploading} />
         </div>
       )}
+
+      {hasPermission('companies.manage') && <AddressForm company={company} onSaved={load} />}
     </div>
+  );
+}
+
+function AddressForm({ company, onSaved }: { company: Company; onSaved: () => void }) {
+  const [street, setStreet] = useState(company.addressStreet ?? '');
+  const [number, setNumber] = useState(company.addressNumber ?? '');
+  const [complement, setComplement] = useState(company.addressComplement ?? '');
+  const [neighborhood, setNeighborhood] = useState(company.addressNeighborhood ?? '');
+  const [city, setCity] = useState(company.addressCity ?? '');
+  const [state, setState] = useState(company.addressState ?? '');
+  const [zipCode, setZipCode] = useState(company.addressZipCode ?? '');
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSaved(false);
+    setSaving(true);
+    try {
+      await api.patch(`/companies/${company.id}`, {
+        addressStreet: street || undefined,
+        addressNumber: number || undefined,
+        addressComplement: complement || undefined,
+        addressNeighborhood: neighborhood || undefined,
+        addressCity: city || undefined,
+        addressState: state || undefined,
+        addressZipCode: zipCode || undefined,
+      });
+      setSaved(true);
+      onSaved();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erro ao salvar endereço.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form className="card" onSubmit={handleSubmit}>
+      <strong style={{ display: 'block', marginBottom: 4 }}>Endereço</strong>
+      <p style={{ fontSize: 12, color: 'var(--ink-muted)', marginTop: 0, marginBottom: 14 }}>
+        Usado no cabeçalho dos contratos gerados e na cláusula de foro (cidade/estado).
+      </p>
+      {error && <div className="error-banner">{error}</div>}
+      {saved && (
+        <div style={{ fontSize: 12.5, color: 'var(--rtv-success)', marginBottom: 12 }}>Endereço salvo.</div>
+      )}
+      <div className="field-group">
+        <div className="field">
+          <label>Rua/Avenida</label>
+          <input value={street} onChange={(e) => setStreet(e.target.value)} />
+        </div>
+        <div className="field">
+          <label>Número</label>
+          <input value={number} onChange={(e) => setNumber(e.target.value)} />
+        </div>
+        <div className="field" style={{ marginBottom: 0 }}>
+          <label>Complemento (opcional)</label>
+          <input value={complement} onChange={(e) => setComplement(e.target.value)} />
+        </div>
+      </div>
+      <div className="field-group">
+        <div className="field">
+          <label>Bairro</label>
+          <input value={neighborhood} onChange={(e) => setNeighborhood(e.target.value)} />
+        </div>
+        <div className="field">
+          <label>Cidade</label>
+          <input value={city} onChange={(e) => setCity(e.target.value)} />
+        </div>
+        <div className="field">
+          <label>Estado (sigla)</label>
+          <input value={state} maxLength={2} onChange={(e) => setState(e.target.value.toUpperCase())} />
+        </div>
+        <div className="field" style={{ marginBottom: 0 }}>
+          <label>CEP</label>
+          <input value={zipCode} onChange={(e) => setZipCode(e.target.value)} />
+        </div>
+      </div>
+      <button className="btn" type="submit" disabled={saving}>
+        {saving ? 'Salvando...' : 'Salvar endereço'}
+      </button>
+    </form>
   );
 }

@@ -122,6 +122,9 @@ function NewRatePlanForm({ vehicles, onCreated }: { vehicles: Vehicle[]; onCreat
   const [dailyRate, setDailyRate] = useState('');
   const [weeklyRate, setWeeklyRate] = useState('');
   const [monthlyRate, setMonthlyRate] = useState('');
+  const [kmAllowancePerMonth, setKmAllowancePerMonth] = useState('');
+  const [extraKmRate, setExtraKmRate] = useState('');
+  const [cautionAmount, setCautionAmount] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -137,6 +140,9 @@ function NewRatePlanForm({ vehicles, onCreated }: { vehicles: Vehicle[]; onCreat
         dailyRate,
         weeklyRate: weeklyRate || undefined,
         monthlyRate: monthlyRate || undefined,
+        kmAllowancePerMonth: kmAllowancePerMonth ? Number(kmAllowancePerMonth) : undefined,
+        extraKmRate: extraKmRate || undefined,
+        cautionAmount: cautionAmount || undefined,
       });
       onCreated();
     } catch (err) {
@@ -195,6 +201,21 @@ function NewRatePlanForm({ vehicles, onCreated }: { vehicles: Vehicle[]; onCreat
       <div className="field">
         <label>Mensal (R$, opcional)</label>
         <input type="number" step="0.01" min="0" value={monthlyRate} onChange={(e) => setMonthlyRate(e.target.value)} />
+      </div>
+      <div className="field-group">
+        <div className="field-group__label">Motorista de aplicativo (opcional — só preencha se for usar esse tipo de contrato)</div>
+        <div className="field">
+          <label>Limite de KM mensal</label>
+          <input type="number" min="0" value={kmAllowancePerMonth} onChange={(e) => setKmAllowancePerMonth(e.target.value)} />
+        </div>
+        <div className="field">
+          <label>Valor do KM excedente (R$)</label>
+          <input type="number" step="0.01" min="0" value={extraKmRate} onChange={(e) => setExtraKmRate(e.target.value)} />
+        </div>
+        <div className="field" style={{ marginBottom: 0 }}>
+          <label>Valor da caução (R$)</label>
+          <input type="number" step="0.01" min="0" value={cautionAmount} onChange={(e) => setCautionAmount(e.target.value)} />
+        </div>
       </div>
       <button className="btn" type="submit" disabled={submitting}>
         {submitting ? 'Cadastrando...' : 'Cadastrar tarifa'}

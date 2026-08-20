@@ -24,8 +24,17 @@ export class UpdateRatePlanDto {
   kmAllowancePerDay?: number;
 
   @IsOptional()
+  @IsInt()
+  @Min(0)
+  kmAllowancePerMonth?: number;
+
+  @IsOptional()
   @IsNumberString()
   extraKmRate?: string;
+
+  @IsOptional()
+  @IsNumberString()
+  cautionAmount?: string;
 
   @IsOptional()
   @IsBoolean()
