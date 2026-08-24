@@ -1,0 +1,9 @@
+[Unit]
+Description=Checagem de saude do rental-saas (disco, RAM, swap, load, certificado)
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/srv/rental-app
+ExecStart=/srv/rental-app/scripts/monitor.sh

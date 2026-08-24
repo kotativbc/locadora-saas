@@ -1,0 +1,10 @@
+[Unit]
+Description=Roda a checagem de saude do rental-saas a cada 30 minutos
+
+[Timer]
+OnCalendar=*:0/30
+Persistent=true
+RandomizedDelaySec=60
+
+[Install]
+WantedBy=timers.target
