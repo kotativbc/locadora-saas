@@ -32,6 +32,11 @@ model Company {
   addressState        String? // sigla, ex: SP, MG
   addressZipCode      String?
 
+  // Contato/privacidade — usado no Aviso de Privacidade gerado pra empresa
+  // (canal de contato do titular de dados, encarregado/responsável).
+  contactEmail       String?
+  privacyOfficerName String?
+
   users     User[]
   auditLogs AuditLog[]
   vehicles  Vehicle[]
@@ -48,6 +53,7 @@ model Company {
   charges       Charge[]
   expenses      Expense[]
   statusEvents  CompanyStatusEvent[]
+  termsAcceptances TermsAcceptance[]
 
   @@map("companies")
 }
@@ -85,6 +91,24 @@ model CompanyStatusEvent {
   @@map("company_status_events")
 }
 
+/// Registro de aceite dos Termos de Uso + Anexo de Tratamento de Dados (DPA)
+/// pelo representante da empresa contratante. Append-only de propósito —
+/// é a evidência jurídica do aceite, nunca deve ser editado ou apagado.
+model TermsAcceptance {
+  id           String   @id @default(uuid())
+  companyId    String
+  company      Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  documentType String   @default("terms_dpa") // hoje só um tipo — Termos de Uso + DPA combinados
+  version      String   // data de vigência da versão aceita, ex: "2026-08-24"
+  ip           String?
+  acceptedAt   DateTime @default(now())
+
+  @@index([companyId])
+  @@map("terms_acceptances")
+}
+
 /// Usuário da plataforma. companyId nulo = usuário da plataforma (Super Admin).
 model User {
   id           String    @id @default(uuid())
@@ -102,6 +126,7 @@ model User {
   refreshTokens RefreshToken[]
   auditLogs     AuditLog[]
   passwordResets PasswordReset[]
+  termsAcceptances TermsAcceptance[]
 
   @@index([companyId])
   @@map("users")

@@ -1,4 +1,4 @@
-import { IsOptional, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsOptional, IsString, MinLength } from 'class-validator';
 
 export class UpdateCompanyDto {
   @IsOptional()
@@ -41,4 +41,12 @@ export class UpdateCompanyDto {
   @IsOptional()
   @IsString()
   addressZipCode?: string;
+
+  @IsOptional()
+  @IsEmail()
+  contactEmail?: string;
+
+  @IsOptional()
+  @IsString()
+  privacyOfficerName?: string;
 }

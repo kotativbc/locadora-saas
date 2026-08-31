@@ -25,6 +25,7 @@ import { AuditModule } from './audit/audit.module';
 import { PlansModule } from './plans/plans.module';
 import { BackupsModule } from './backups/backups.module';
 import { EmailModule } from './email/email.module';
+import { LegalModule } from './legal/legal.module';
 import { HealthController } from './common/health.controller';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { ImpersonationReadOnlyGuard } from './auth/impersonation-read-only.guard';
@@ -44,6 +45,7 @@ import { PermissionsGuard } from './rbac/permissions.guard';
     DocumentsModule,
     FinanceModule,
     PlansModule,
+    LegalModule,
     AuthModule,
     RbacModule,
     CompaniesModule,

@@ -20,6 +20,7 @@ import { SetUserActiveDto } from './dto/set-user-active.dto';
 import { SetCompanyPlanDto } from './dto/set-company-plan.dto';
 import { UsersService } from '../users/users.service';
 import { AuthService } from '../auth/auth.service';
+import { PrivacyNoticePdfService } from '../legal/privacy-notice-pdf.service';
 import { RequirePermissions } from '../rbac/permissions.decorator';
 import { PermissionCode } from '../rbac/rbac.constants';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -33,6 +34,7 @@ export class CompaniesController {
     private readonly companiesService: CompaniesService,
     private readonly usersService: UsersService,
     private readonly authService: AuthService,
+    private readonly privacyNoticePdfService: PrivacyNoticePdfService,
   ) {}
 
   @Post()
@@ -149,5 +151,20 @@ export class CompaniesController {
   async getLogo(@Param('id') id: string, @CurrentUser() actor: RequestUser, @Res() res: Response) {
     const { absolutePath, filename } = await this.companiesService.readLogo(id, actor);
     res.sendFile(absolutePath, { headers: { 'Content-Disposition': `inline; filename="${filename}"` } });
+  }
+
+  /**
+   * Aviso de Privacidade (Parte C) gerado automaticamente com os dados desta
+   * empresa. Rascunho pra revisão jurídica, não publicação direta — deixa
+   * bem marcado no próprio PDF.
+   */
+  @Get(':id/privacy-notice-pdf')
+  @RequirePermissions(PermissionCode.COMPANIES_MANAGE, PermissionCode.PLATFORM_MANAGE)
+  async getPrivacyNoticePdf(@Param('id') id: string, @CurrentUser() actor: RequestUser, @Res() res: Response) {
+    const company = await this.companiesService.findOne(id, actor);
+    const buffer = await this.privacyNoticePdfService.render({ company, generatedAt: new Date() });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="aviso-privacidade-${id.slice(0, 8)}.pdf"`);
+    res.send(buffer);
   }
 }

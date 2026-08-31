@@ -16,6 +16,8 @@ interface Company {
   addressCity: string | null;
   addressState: string | null;
   addressZipCode: string | null;
+  contactEmail: string | null;
+  privacyOfficerName: string | null;
 }
 
 export function MyCompany() {
@@ -128,6 +130,8 @@ export function MyCompany() {
       )}
 
       {hasPermission('companies.manage') && <AddressForm company={company} onSaved={load} />}
+
+      {hasPermission('companies.manage') && <PrivacySection company={company} onSaved={load} />}
     </div>
   );
 }
@@ -213,6 +217,84 @@ function AddressForm({ company, onSaved }: { company: Company; onSaved: () => vo
       <button className="btn" type="submit" disabled={saving}>
         {saving ? 'Salvando...' : 'Salvar endereço'}
       </button>
+    </form>
+  );
+}
+
+function PrivacySection({ company, onSaved }: { company: Company; onSaved: () => void }) {
+  const [contactEmail, setContactEmail] = useState(company.contactEmail ?? '');
+  const [privacyOfficerName, setPrivacyOfficerName] = useState(company.privacyOfficerName ?? '');
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSaved(false);
+    setSaving(true);
+    try {
+      await api.patch(`/companies/${company.id}`, {
+        contactEmail: contactEmail || undefined,
+        privacyOfficerName: privacyOfficerName || undefined,
+      });
+      setSaved(true);
+      onSaved();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erro ao salvar.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDownload() {
+    setDownloading(true);
+    setError(null);
+    try {
+      const url = await fetchFileUrl(`/companies/${company.id}/privacy-notice-pdf`);
+      window.open(url, '_blank');
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erro ao gerar o aviso de privacidade.');
+    } finally {
+      setDownloading(false);
+    }
+  }
+
+  return (
+    <form className="card" onSubmit={handleSubmit}>
+      <strong style={{ display: 'block', marginBottom: 4 }}>Privacidade (LGPD)</strong>
+      <p style={{ fontSize: 12, color: 'var(--ink-muted)', marginTop: 0, marginBottom: 14 }}>
+        Canal de contato e encarregado usados no Aviso de Privacidade que sua empresa apresenta aos clientes finais.
+      </p>
+      {error && <div className="error-banner">{error}</div>}
+      {saved && <div style={{ fontSize: 12.5, color: 'var(--rtv-success)', marginBottom: 12 }}>Salvo.</div>}
+      <div className="field">
+        <label>E-mail de contato / canal de privacidade</label>
+        <input type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} placeholder="privacidade@suaempresa.com.br" />
+      </div>
+      <div className="field" style={{ marginBottom: 0 }}>
+        <label>Encarregado ou responsável (opcional)</label>
+        <input value={privacyOfficerName} onChange={(e) => setPrivacyOfficerName(e.target.value)} />
+      </div>
+      <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+        <button className="btn" type="submit" disabled={saving}>
+          {saving ? 'Salvando...' : 'Salvar'}
+        </button>
+        <button
+          type="button"
+          className="logout-btn"
+          style={{ color: 'var(--rtv-navy-900)', borderColor: 'var(--rtv-line-strong)' }}
+          disabled={downloading}
+          onClick={handleDownload}
+        >
+          {downloading ? 'Gerando...' : 'Baixar Aviso de Privacidade (rascunho)'}
+        </button>
+      </div>
+      <p style={{ fontSize: 11.5, color: 'var(--ink-muted)', marginTop: 10, marginBottom: 0 }}>
+        O PDF gerado é um rascunho a partir do seu cadastro — revise com um advogado antes de publicar pros seus
+        clientes, principalmente os prazos de retenção, que o documento não preenche sozinho.
+      </p>
     </form>
   );
 }
