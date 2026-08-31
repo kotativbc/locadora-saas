@@ -14,6 +14,10 @@ export class CreateCustomerDto {
   documentType?: 'CPF' | 'CNPJ';
 
   @IsOptional()
+  @IsString()
+  identityNumber?: string;
+
+  @IsOptional()
   @IsEmail()
   email?: string;
 

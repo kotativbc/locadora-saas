@@ -7,6 +7,10 @@ export class UpdateCustomerDto {
   name?: string;
 
   @IsOptional()
+  @IsString()
+  identityNumber?: string;
+
+  @IsOptional()
   @IsEmail()
   email?: string;
 

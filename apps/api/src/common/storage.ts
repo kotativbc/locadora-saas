@@ -13,6 +13,11 @@ export function companyLogoDir(companyId: string): string {
   return path.join(UPLOADS_ROOT, 'companies', companyId);
 }
 
+/** As duas raízes de arquivo de uma empresa — usado pra limpar disco quando ela é apagada de vez. */
+export function companyUploadDirs(companyId: string): string[] {
+  return [path.join(UPLOADS_ROOT, 'companies', companyId), path.join(UPLOADS_ROOT, companyId)];
+}
+
 export function ownerDocumentsDir(
   companyId: string,
   ownerType: 'customers' | 'vehicles' | 'inspections' | 'claims',

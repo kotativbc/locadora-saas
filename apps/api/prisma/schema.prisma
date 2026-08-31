@@ -288,6 +288,7 @@ model Customer {
   name                   String
   document               String // CPF ou CNPJ
   documentType           String    @default("CPF") // CPF | CNPJ
+  identityNumber         String? // RG/Identidade — usado nos modelos de contrato mais completos
   email                  String?
   phone                  String?
   birthDate              DateTime?
@@ -383,7 +384,7 @@ model Contract {
   vehicle           Vehicle   @relation(fields: [vehicleId], references: [id])
   ratePlanId        String?
   ratePlan          RatePlan? @relation(fields: [ratePlanId], references: [id], onDelete: SetNull)
-  templateType      String    @default("standard") // standard | monthly_app_driver — qual modelo de PDF gerar
+  templateType      String    @default("standard") // standard | monthly_app_driver | protected — qual modelo de PDF gerar
   startDate         DateTime
   endDate           DateTime
   dailyRateSnapshot Decimal   @db.Decimal(10, 2)
@@ -407,11 +408,29 @@ model Contract {
   claims      Claim[]
   fines       Fine[]
   charges     Charge[]
+  cautionInstallments CautionInstallment[]
 
   @@index([companyId])
   @@index([customerId])
   @@index([vehicleId])
   @@map("contracts")
+}
+
+/// Parcela negociada da caução (Anexo II) — cronograma manual, cada parcela
+/// pode ter valor diferente (não é uma divisão automática/igual). Puramente
+/// informativo/controle — não gera Charge (financeiro), já que caução é
+/// depósito reembolsável, não receita.
+model CautionInstallment {
+  id         String    @id @default(uuid())
+  contractId String
+  contract   Contract  @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  dueDate    DateTime
+  amount     Decimal   @db.Decimal(10, 2)
+  paidAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([contractId])
+  @@map("caution_installments")
 }
 
 /// Sessão de assinatura interna de um contrato — link público de uso único.

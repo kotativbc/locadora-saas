@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Eye } from 'lucide-react';
 import { api, ApiError } from '../api';
@@ -25,6 +25,15 @@ interface Company {
   planId: string | null;
   plan: Plan | null;
   createdAt: string;
+  addressStreet: string | null;
+  addressNumber: string | null;
+  addressComplement: string | null;
+  addressNeighborhood: string | null;
+  addressCity: string | null;
+  addressState: string | null;
+  addressZipCode: string | null;
+  contactEmail: string | null;
+  privacyOfficerName: string | null;
 }
 
 interface Summary {
@@ -67,6 +76,7 @@ export function CompanyDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [statusFormOpen, setStatusFormOpen] = useState(false);
+  const [editFormOpen, setEditFormOpen] = useState(false);
   const [planFormOpen, setPlanFormOpen] = useState(false);
   const [availablePlans, setAvailablePlans] = useState<Plan[]>([]);
   const [selectedPlanId, setSelectedPlanId] = useState('');
@@ -201,6 +211,13 @@ export function CompanyDetail() {
           >
             <Eye size={14} /> {enteringSupport ? 'Entrando...' : 'Entrar como (somente leitura)'}
           </button>
+          <button
+            className="logout-btn"
+            style={{ color: 'var(--rtv-navy-900)', borderColor: 'var(--rtv-line-strong)' }}
+            onClick={() => setEditFormOpen((v) => !v)}
+          >
+            {editFormOpen ? 'Cancelar' : 'Editar dados'}
+          </button>
           <button className="btn btn--accent" onClick={() => setStatusFormOpen((v) => !v)}>
             {statusFormOpen ? 'Cancelar' : 'Mudar estado'}
           </button>
@@ -208,6 +225,17 @@ export function CompanyDetail() {
       </div>
 
       {error && <div className="error-banner">{error}</div>}
+
+      {editFormOpen && (
+        <EditCompanyForm
+          company={company}
+          onSaved={() => {
+            setEditFormOpen(false);
+            load();
+          }}
+          onCancel={() => setEditFormOpen(false)}
+        />
+      )}
 
       {statusFormOpen && (
         <ChangeCompanyStatusForm
@@ -386,6 +414,211 @@ export function CompanyDetail() {
           </table>
         )}
       </div>
+
+      {company.status === 'archived' && (
+        <DangerZone company={company} onDeleted={() => navigate('/empresas')} />
+      )}
+    </div>
+  );
+}
+
+function EditCompanyForm({
+  company,
+  onSaved,
+  onCancel,
+}: {
+  company: Company;
+  onSaved: () => void;
+  onCancel: () => void;
+}) {
+  const [name, setName] = useState(company.name);
+  const [tradeName, setTradeName] = useState(company.tradeName ?? '');
+  const [cnpj, setCnpj] = useState(company.cnpj ?? '');
+  const [addressStreet, setAddressStreet] = useState(company.addressStreet ?? '');
+  const [addressNumber, setAddressNumber] = useState(company.addressNumber ?? '');
+  const [addressComplement, setAddressComplement] = useState(company.addressComplement ?? '');
+  const [addressNeighborhood, setAddressNeighborhood] = useState(company.addressNeighborhood ?? '');
+  const [addressCity, setAddressCity] = useState(company.addressCity ?? '');
+  const [addressState, setAddressState] = useState(company.addressState ?? '');
+  const [addressZipCode, setAddressZipCode] = useState(company.addressZipCode ?? '');
+  const [contactEmail, setContactEmail] = useState(company.contactEmail ?? '');
+  const [privacyOfficerName, setPrivacyOfficerName] = useState(company.privacyOfficerName ?? '');
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSaving(true);
+    try {
+      await api.patch(`/companies/${company.id}`, {
+        name,
+        tradeName: tradeName || undefined,
+        cnpj: cnpj || undefined,
+        addressStreet: addressStreet || undefined,
+        addressNumber: addressNumber || undefined,
+        addressComplement: addressComplement || undefined,
+        addressNeighborhood: addressNeighborhood || undefined,
+        addressCity: addressCity || undefined,
+        addressState: addressState || undefined,
+        addressZipCode: addressZipCode || undefined,
+        contactEmail: contactEmail || undefined,
+        privacyOfficerName: privacyOfficerName || undefined,
+      });
+      onSaved();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erro ao salvar.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form className="card" onSubmit={handleSubmit}>
+      <h3 style={{ marginTop: 0 }}>Editar dados — {company.name}</h3>
+      {error && <div className="error-banner">{error}</div>}
+
+      <div className="field-group">
+        <div className="field-group__label">Identificação</div>
+        <div className="field">
+          <label>Razão social</label>
+          <input required value={name} onChange={(e) => setName(e.target.value)} />
+        </div>
+        <div className="field">
+          <label>Nome fantasia</label>
+          <input value={tradeName} onChange={(e) => setTradeName(e.target.value)} />
+        </div>
+        <div className="field" style={{ marginBottom: 0 }}>
+          <label>CNPJ</label>
+          <input value={cnpj} onChange={(e) => setCnpj(e.target.value)} />
+        </div>
+      </div>
+
+      <div className="field-group">
+        <div className="field-group__label">Endereço</div>
+        <div className="field">
+          <label>Rua/Avenida</label>
+          <input value={addressStreet} onChange={(e) => setAddressStreet(e.target.value)} />
+        </div>
+        <div className="field">
+          <label>Número</label>
+          <input value={addressNumber} onChange={(e) => setAddressNumber(e.target.value)} />
+        </div>
+        <div className="field">
+          <label>Complemento</label>
+          <input value={addressComplement} onChange={(e) => setAddressComplement(e.target.value)} />
+        </div>
+        <div className="field">
+          <label>Bairro</label>
+          <input value={addressNeighborhood} onChange={(e) => setAddressNeighborhood(e.target.value)} />
+        </div>
+        <div className="field">
+          <label>Cidade</label>
+          <input value={addressCity} onChange={(e) => setAddressCity(e.target.value)} />
+        </div>
+        <div className="field">
+          <label>Estado (sigla)</label>
+          <input value={addressState} maxLength={2} onChange={(e) => setAddressState(e.target.value.toUpperCase())} />
+        </div>
+        <div className="field" style={{ marginBottom: 0 }}>
+          <label>CEP</label>
+          <input value={addressZipCode} onChange={(e) => setAddressZipCode(e.target.value)} />
+        </div>
+      </div>
+
+      <div className="field-group">
+        <div className="field-group__label">Contato / privacidade</div>
+        <div className="field">
+          <label>E-mail de contato</label>
+          <input type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} />
+        </div>
+        <div className="field" style={{ marginBottom: 0 }}>
+          <label>Encarregado (opcional)</label>
+          <input value={privacyOfficerName} onChange={(e) => setPrivacyOfficerName(e.target.value)} />
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button className="btn" type="submit" disabled={saving}>
+          {saving ? 'Salvando...' : 'Salvar alterações'}
+        </button>
+        <button type="button" className="logout-btn" style={{ color: 'var(--ink-muted)', borderColor: 'var(--border)' }} onClick={onCancel}>
+          Cancelar
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function DangerZone({ company, onDeleted }: { company: Company; onDeleted: () => void }) {
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmName, setConfirmName] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  async function handleDelete() {
+    setError(null);
+    setDeleting(true);
+    try {
+      await api.delete(`/companies/${company.id}`, { confirmName });
+      onDeleted();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erro ao excluir.');
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  return (
+    <div className="card" style={{ borderColor: 'var(--rtv-danger)' }}>
+      <strong style={{ color: 'var(--rtv-danger)', display: 'block', marginBottom: 4 }}>Zona de risco</strong>
+      <p style={{ fontSize: 13, color: 'var(--ink-muted)', marginTop: 0, marginBottom: 14 }}>
+        Excluir permanentemente apaga esta empresa e tudo que pertence a ela — usuários, veículos, clientes,
+        contratos, financeiro, documentos. Não tem como desfazer. Só é possível porque esta empresa já está
+        "Arquivada"; o histórico de auditoria da exclusão em si fica registrado, mas não a empresa.
+      </p>
+
+      {error && <div className="error-banner">{error}</div>}
+
+      {!confirmOpen ? (
+        <button
+          className="logout-btn"
+          style={{ color: 'var(--rtv-danger)', borderColor: 'var(--rtv-danger)' }}
+          onClick={() => setConfirmOpen(true)}
+        >
+          Excluir permanentemente
+        </button>
+      ) : (
+        <div>
+          <div className="field">
+            <label>
+              Digite exatamente <strong>{company.name}</strong> pra confirmar
+            </label>
+            <input value={confirmName} onChange={(e) => setConfirmName(e.target.value)} autoFocus />
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              className="btn"
+              style={{ background: 'var(--rtv-danger)' }}
+              disabled={confirmName !== company.name || deleting}
+              onClick={handleDelete}
+            >
+              {deleting ? 'Excluindo...' : 'Confirmar exclusão definitiva'}
+            </button>
+            <button
+              type="button"
+              className="logout-btn"
+              style={{ color: 'var(--ink-muted)', borderColor: 'var(--border)' }}
+              onClick={() => {
+                setConfirmOpen(false);
+                setConfirmName('');
+              }}
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -10,6 +10,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../common/audit-log.service';
 import { ContractPdfService } from './pdf/contract-pdf.service';
 import { CreateContractDto } from './dto/create-contract.dto';
+import { CreateCautionInstallmentDto } from './dto/create-caution-installment.dto';
+import { UpdateCautionInstallmentDto } from './dto/update-caution-installment.dto';
 import { RequestUser } from '../auth/types';
 
 const SIGNATURE_LINK_TTL_HOURS = 48;
@@ -98,6 +100,27 @@ export class ContractsService {
       monthlyKmLimitSnapshot = ratePlan.kmAllowancePerMonth ?? undefined;
       extraKmRateSnapshot = ratePlan.extraKmRate?.toString();
       cautionAmountSnapshot = ratePlan.cautionAmount?.toString();
+    } else if (templateType === 'protected') {
+      // "Padrão com proteção total" — diária normal (qualquer duração), mas
+      // exige tarifa com caução, limite de KM e KM excedente cadastrados,
+      // já que essas cláusulas são o motivo de escolher esse modelo.
+      if (!dto.ratePlanId) {
+        throw new BadRequestException('Contrato com proteção total exige uma tarifa cadastrada com caução e limite de KM.');
+      }
+      const ratePlan = await this.prisma.ratePlan.findUnique({ where: { id: dto.ratePlanId } });
+      if (!ratePlan || ratePlan.companyId !== actor.companyId) {
+        throw new NotFoundException('Tarifa não encontrada nesta empresa.');
+      }
+      if (!ratePlan.cautionAmount || !ratePlan.kmAllowancePerMonth || !ratePlan.extraKmRate) {
+        throw new BadRequestException(
+          'Esta tarifa precisa ter caução, limite de KM mensal e valor do KM excedente cadastrados pra usar neste tipo de contrato.',
+        );
+      }
+      dailyRate = ratePlan.dailyRate.toString();
+      totalValue = (Number(dailyRate) * days).toFixed(2);
+      monthlyKmLimitSnapshot = ratePlan.kmAllowancePerMonth;
+      extraKmRateSnapshot = ratePlan.extraKmRate.toString();
+      cautionAmountSnapshot = ratePlan.cautionAmount.toString();
     } else if (dto.ratePlanId) {
       const ratePlan = await this.prisma.ratePlan.findUnique({ where: { id: dto.ratePlanId } });
       if (!ratePlan || ratePlan.companyId !== actor.companyId) {
@@ -157,6 +180,59 @@ export class ContractsService {
 
   async findOne(id: string, actor: RequestUser) {
     return this.findAndAssertSameCompany(id, actor);
+  }
+
+  // ---------- Parcelas de caução (Anexo II — cronograma manual) ----------
+
+  async listCautionInstallments(contractId: string, actor: RequestUser) {
+    await this.findAndAssertSameCompany(contractId, actor);
+    return this.prisma.cautionInstallment.findMany({
+      where: { contractId },
+      orderBy: { dueDate: 'asc' },
+    });
+  }
+
+  async addCautionInstallment(contractId: string, dto: CreateCautionInstallmentDto, actor: RequestUser) {
+    await this.findAndAssertSameCompany(contractId, actor);
+    const installment = await this.prisma.cautionInstallment.create({
+      data: { contractId, dueDate: new Date(dto.dueDate), amount: dto.amount },
+    });
+    await this.auditLog.record({
+      action: 'contract.caution_installment_added',
+      userId: actor.id,
+      companyId: actor.companyId,
+      entityType: 'CautionInstallment',
+      entityId: installment.id,
+      metadata: { contractId, amount: dto.amount, dueDate: dto.dueDate },
+    });
+    return installment;
+  }
+
+  async setCautionInstallmentPaid(
+    contractId: string,
+    installmentId: string,
+    dto: UpdateCautionInstallmentDto,
+    actor: RequestUser,
+  ) {
+    await this.findAndAssertSameCompany(contractId, actor);
+    const installment = await this.prisma.cautionInstallment.findUnique({ where: { id: installmentId } });
+    if (!installment || installment.contractId !== contractId) {
+      throw new NotFoundException('Parcela não encontrada neste contrato.');
+    }
+    return this.prisma.cautionInstallment.update({
+      where: { id: installmentId },
+      data: { paidAt: dto.paid ? new Date() : null },
+    });
+  }
+
+  async removeCautionInstallment(contractId: string, installmentId: string, actor: RequestUser) {
+    await this.findAndAssertSameCompany(contractId, actor);
+    const installment = await this.prisma.cautionInstallment.findUnique({ where: { id: installmentId } });
+    if (!installment || installment.contractId !== contractId) {
+      throw new NotFoundException('Parcela não encontrada neste contrato.');
+    }
+    await this.prisma.cautionInstallment.delete({ where: { id: installmentId } });
+    return { deleted: true };
   }
 
   /** Gera (ou renova) o link público de assinatura de um contrato em rascunho. */

@@ -7,8 +7,9 @@ import { AuditLogService } from '../common/audit-log.service';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 import { ChangeCompanyStatusDto } from './dto/change-company-status.dto';
+import { DeleteCompanyDto } from './dto/delete-company.dto';
 import { RoleCode } from '../rbac/rbac.constants';
-import { companyLogoDir } from '../common/storage';
+import { companyLogoDir, companyUploadDirs } from '../common/storage';
 import { RequestUser } from '../auth/types';
 import {
   CompanyStatus,
@@ -214,6 +215,47 @@ export class CompaniesService {
     });
 
     return updated;
+  }
+
+  /**
+   * Só Super Admin, e só a partir do estado "Arquivada" — exclusão de
+   * verdade, cascateia 20+ tabelas (contratos, financeiro, clientes, tudo).
+   * Exige digitar o nome exato da empresa como confirmação. O registro de
+   * auditoria é gravado ANTES de apagar, com o nome em texto (não como
+   * referência), porque depois de apagada não existe mais linha pra apontar.
+   */
+  async deletePermanently(id: string, dto: DeleteCompanyDto, actor: RequestUser) {
+    const company = await this.prisma.company.findUnique({ where: { id } });
+    if (!company) {
+      throw new NotFoundException('Empresa não encontrada.');
+    }
+    if (company.status !== CompanyStatus.ARCHIVED) {
+      throw new BadRequestException(
+        'Só é possível excluir permanentemente uma empresa que já está no estado "Arquivada". Mude o estado dela primeiro.',
+      );
+    }
+    if (dto.confirmName !== company.name) {
+      throw new BadRequestException('O nome digitado não confere com o nome exato da empresa.');
+    }
+
+    await this.auditLog.record({
+      action: 'company.permanently_deleted',
+      userId: actor.id,
+      companyId: null, // depois do delete não sobra empresa pra apontar — fica só no metadata
+      entityType: 'Company',
+      entityId: id,
+      metadata: { name: company.name, cnpj: company.cnpj, deletedCompanyId: id },
+    });
+
+    await this.prisma.company.delete({ where: { id } });
+
+    // Limpeza de arquivo é melhor-esforço — o dado já foi apagado do banco
+    // (isso é o que importa de verdade); se sobrar lixo em disco, não trava a operação.
+    for (const dir of companyUploadDirs(id)) {
+      await fs.rm(dir, { recursive: true, force: true }).catch(() => undefined);
+    }
+
+    return { deleted: true };
   }
 
   async saveLogo(id: string, file: Express.Multer.File, actor: RequestUser) {

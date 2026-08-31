@@ -19,8 +19,8 @@ export class CreateContractDto {
   dailyRate?: string;
 
   @IsOptional()
-  @IsIn(['standard', 'monthly_app_driver'])
-  templateType?: 'standard' | 'monthly_app_driver';
+  @IsIn(['standard', 'monthly_app_driver', 'protected'])
+  templateType?: 'standard' | 'monthly_app_driver' | 'protected';
 
   @IsDateString()
   startDate!: string;

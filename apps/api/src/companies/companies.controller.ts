@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Ip,
   Param,
@@ -16,6 +17,7 @@ import { CompaniesService } from './companies.service';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 import { ChangeCompanyStatusDto } from './dto/change-company-status.dto';
+import { DeleteCompanyDto } from './dto/delete-company.dto';
 import { SetUserActiveDto } from './dto/set-user-active.dto';
 import { SetCompanyPlanDto } from './dto/set-company-plan.dto';
 import { UsersService } from '../users/users.service';
@@ -79,6 +81,17 @@ export class CompaniesController {
   @RequirePermissions(PermissionCode.COMPANIES_MANAGE, PermissionCode.PLATFORM_MANAGE)
   getStatusHistory(@Param('id') id: string, @CurrentUser() actor: RequestUser) {
     return this.companiesService.getStatusHistory(id, actor);
+  }
+
+  /**
+   * Só Super Admin, só a partir de "Arquivada" — exclusão de verdade,
+   * cascateia tudo (contratos, financeiro, clientes...). Exige o nome exato
+   * da empresa no corpo da requisição como confirmação.
+   */
+  @Delete(':id')
+  @RequirePermissions(PermissionCode.PLATFORM_MANAGE)
+  deletePermanently(@Param('id') id: string, @Body() dto: DeleteCompanyDto, @CurrentUser() actor: RequestUser) {
+    return this.companiesService.deletePermanently(id, dto, actor);
   }
 
   /** Página de detalhe: dados da empresa + números de consumo (usuários, veículos, clientes, contratos). */
