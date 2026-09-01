@@ -30,6 +30,7 @@ interface RatePlan {
 interface Contract {
   id: string;
   status: string;
+  templateType: string;
   startDate: string;
   endDate: string;
   totalValue: string;
@@ -73,6 +74,7 @@ export function Contracts() {
   const [inspectionTarget, setInspectionTarget] = useState<{ contract: Contract; type: 'delivery' | 'return' } | null>(
     null,
   );
+  const [installmentsTarget, setInstallmentsTarget] = useState<Contract | null>(null);
 
   async function load() {
     setLoading(true);
@@ -241,6 +243,15 @@ export function Contracts() {
                         Registrar devolução
                       </button>
                     )}
+                    {c.templateType === 'protected' && (
+                      <button
+                        className="logout-btn"
+                        style={{ color: 'var(--primary)', borderColor: 'var(--border)' }}
+                        onClick={() => setInstallmentsTarget(c)}
+                      >
+                        Parcelas da caução
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -259,6 +270,10 @@ export function Contracts() {
           }}
           onCancel={() => setInspectionTarget(null)}
         />
+      )}
+
+      {installmentsTarget && (
+        <CautionInstallmentsPanel contract={installmentsTarget} onClose={() => setInstallmentsTarget(null)} />
       )}
 
       {formOpen && (
@@ -289,8 +304,9 @@ function NewContractForm({
 }) {
   const [customerId, setCustomerId] = useState(customers[0]?.id ?? '');
   const [vehicleId, setVehicleId] = useState(vehicles[0]?.id ?? '');
-  const [templateType, setTemplateType] = useState<'standard' | 'monthly_app_driver'>('standard');
+  const [templateType, setTemplateType] = useState<'standard' | 'monthly_app_driver' | 'protected'>('standard');
   const monthlyPlans = ratePlans.filter((r) => r.monthlyRate);
+  const protectedPlans = ratePlans.filter((r) => r.cautionAmount && r.kmAllowancePerMonth && r.extraKmRate);
   const [rateMode, setRateMode] = useState<'plan' | 'manual'>(ratePlans.length ? 'plan' : 'manual');
   const [ratePlanId, setRatePlanId] = useState(ratePlans[0]?.id ?? '');
   const [dailyRate, setDailyRate] = useState('');
@@ -300,12 +316,16 @@ function NewContractForm({
   const [submitting, setSubmitting] = useState(false);
 
   const selectedMonthlyPlan = monthlyPlans.find((r) => r.id === ratePlanId);
+  const selectedProtectedPlan = protectedPlans.find((r) => r.id === ratePlanId);
 
-  function handleTemplateTypeChange(value: 'standard' | 'monthly_app_driver') {
+  function handleTemplateTypeChange(value: 'standard' | 'monthly_app_driver' | 'protected') {
     setTemplateType(value);
     if (value === 'monthly_app_driver') {
       setRateMode('plan');
       setRatePlanId(monthlyPlans[0]?.id ?? '');
+    } else if (value === 'protected') {
+      setRateMode('plan');
+      setRatePlanId(protectedPlans[0]?.id ?? '');
     }
   }
 
@@ -318,7 +338,7 @@ function NewContractForm({
         customerId,
         vehicleId,
         templateType,
-        ratePlanId: templateType === 'monthly_app_driver' || rateMode === 'plan' ? ratePlanId : undefined,
+        ratePlanId: templateType !== 'standard' || rateMode === 'plan' ? ratePlanId : undefined,
         dailyRate: templateType === 'standard' && rateMode === 'manual' ? dailyRate : undefined,
         startDate: new Date(startDate).toISOString(),
         endDate: new Date(endDate).toISOString(),
@@ -351,6 +371,7 @@ function NewContractForm({
         <div className="field" style={{ marginBottom: 0 }}>
           <select value={templateType} onChange={(e) => handleTemplateTypeChange(e.target.value as typeof templateType)}>
             <option value="standard">Padrão (diária/semanal/mensal)</option>
+            <option value="protected">Padrão com Proteção Total (caução, KM controlado, telemetria)</option>
             <option value="monthly_app_driver">Motorista de aplicativo (mensal, com caução e KM controlado)</option>
           </select>
         </div>
@@ -410,6 +431,36 @@ function NewContractForm({
             </>
           )}
         </div>
+      ) : templateType === 'protected' ? (
+        <div className="field-group">
+          <div className="field-group__label">Tarifa (com proteção total)</div>
+          {protectedPlans.length === 0 ? (
+            <p style={{ fontSize: 13, color: 'var(--rtv-danger)', marginTop: 0 }}>
+              Nenhuma tarifa com caução, limite de KM e KM excedente cadastrados. Vá em Tarifas e preencha esses
+              três campos antes de criar este tipo de contrato.
+            </p>
+          ) : (
+            <>
+              <div className="field" style={{ marginBottom: 0 }}>
+                <label>Plano de tarifa</label>
+                <select value={ratePlanId} onChange={(e) => setRatePlanId(e.target.value)}>
+                  {protectedPlans.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.name} — {formatCurrency(r.dailyRate)}/dia
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {selectedProtectedPlan && (
+                <p style={{ fontSize: 12, color: 'var(--ink-muted)', marginTop: 10, marginBottom: 0 }}>
+                  Limite de KM: {selectedProtectedPlan.kmAllowancePerMonth} km/mês · KM excedente:{' '}
+                  {formatCurrency(selectedProtectedPlan.extraKmRate!)} · Caução:{' '}
+                  {formatCurrency(selectedProtectedPlan.cautionAmount!)}
+                </p>
+              )}
+            </>
+          )}
+        </div>
       ) : (
         <div className="field-group">
           <div className="field-group__label">Tarifa</div>
@@ -443,12 +494,12 @@ function NewContractForm({
       <div className="field-group">
         <div className="field-group__label">Período</div>
         <div className="field">
-          <label>Data de retirada</label>
-          <input required type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+          <label>Data e hora de retirada</label>
+          <input required type="datetime-local" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
         </div>
         <div className="field" style={{ marginBottom: 0 }}>
-          <label>Data de devolução prevista{templateType === 'monthly_app_driver' ? ' (fim do ciclo atual)' : ''}</label>
-          <input required type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+          <label>Data e hora de devolução prevista{templateType === 'monthly_app_driver' ? ' (fim do ciclo atual)' : ''}</label>
+          <input required type="datetime-local" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
         </div>
       </div>
 
@@ -465,6 +516,165 @@ function NewContractForm({
 }
 
 const FUEL_LEVELS = ['cheio', '3/4', '1/2', '1/4', 'reserva'];
+
+interface CautionInstallment {
+  id: string;
+  dueDate: string;
+  amount: string;
+  paidAt: string | null;
+}
+
+function CautionInstallmentsPanel({ contract, onClose }: { contract: Contract; onClose: () => void }) {
+  const [installments, setInstallments] = useState<CautionInstallment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [dueDate, setDueDate] = useState('');
+  const [amount, setAmount] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function load() {
+    setLoading(true);
+    try {
+      setInstallments(await api.get<CautionInstallment[]>(`/contracts/${contract.id}/caution-installments`));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erro ao carregar parcelas.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contract.id]);
+
+  async function handleAdd(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    try {
+      await api.post(`/contracts/${contract.id}/caution-installments`, { dueDate, amount });
+      setDueDate('');
+      setAmount('');
+      load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erro ao adicionar parcela.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleTogglePaid(installment: CautionInstallment) {
+    try {
+      await api.patch(`/contracts/${contract.id}/caution-installments/${installment.id}`, {
+        paid: !installment.paidAt,
+      });
+      load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erro ao atualizar parcela.');
+    }
+  }
+
+  async function handleRemove(installmentId: string) {
+    try {
+      await api.delete(`/contracts/${contract.id}/caution-installments/${installmentId}`);
+      load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erro ao remover parcela.');
+    }
+  }
+
+  const total = installments.reduce((sum, i) => sum + Number(i.amount), 0);
+
+  return (
+    <div className="card">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+        <h3 style={{ margin: 0 }}>
+          Parcelas da caução — {contract.customer.name}
+        </h3>
+        <button type="button" className="logout-btn" style={{ color: 'var(--ink-muted)', borderColor: 'var(--border)' }} onClick={onClose}>
+          Fechar
+        </button>
+      </div>
+      <p style={{ fontSize: 12, color: 'var(--ink-muted)', marginTop: 0, marginBottom: 14 }}>
+        Cronograma manual — cada parcela pode ter valor diferente. Aparece no Anexo II do contrato (PDF) só quando
+        houver pelo menos uma parcela cadastrada; sem nenhuma, o PDF mostra a caução como pagamento único.
+      </p>
+
+      {error && <div className="error-banner">{error}</div>}
+
+      {loading ? (
+        <p>Carregando...</p>
+      ) : (
+        <>
+          {installments.length > 0 && (
+            <table style={{ marginBottom: 16 }}>
+              <thead>
+                <tr>
+                  <th>Vencimento</th>
+                  <th>Valor</th>
+                  <th>Status</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {installments.map((i) => (
+                  <tr key={i.id}>
+                    <td>{new Date(i.dueDate).toLocaleDateString('pt-BR')}</td>
+                    <td>{formatCurrency(i.amount)}</td>
+                    <td>
+                      <button
+                        type="button"
+                        className="logout-btn"
+                        style={{
+                          color: i.paidAt ? 'var(--rtv-success)' : 'var(--ink-muted)',
+                          borderColor: 'var(--border)',
+                          padding: '2px 10px',
+                        }}
+                        onClick={() => handleTogglePaid(i)}
+                      >
+                        {i.paidAt ? `Pago em ${new Date(i.paidAt).toLocaleDateString('pt-BR')}` : 'Marcar como pago'}
+                      </button>
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        className="logout-btn"
+                        style={{ color: 'var(--rtv-danger)', borderColor: 'var(--border)', padding: '2px 10px' }}
+                        onClick={() => handleRemove(i.id)}
+                      >
+                        Remover
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          {installments.length > 0 && (
+            <p style={{ fontSize: 13, marginBottom: 16 }}>
+              <strong>Total parcelado: {formatCurrency(total.toFixed(2))}</strong>
+            </p>
+          )}
+
+          <form onSubmit={handleAdd} style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>Vencimento</label>
+              <input required type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+            </div>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>Valor (R$)</label>
+              <input required type="number" step="0.01" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} />
+            </div>
+            <button className="btn" type="submit" disabled={submitting}>
+              {submitting ? 'Adicionando...' : '+ Adicionar parcela'}
+            </button>
+          </form>
+        </>
+      )}
+    </div>
+  );
+}
 
 function InspectionForm({
   contract,

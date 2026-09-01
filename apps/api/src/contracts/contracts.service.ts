@@ -356,6 +356,84 @@ export class ContractsService {
       });
     }
 
+    if (contract.templateType === 'protected') {
+      const [deliveryInspection, returnInspection, cautionInstallments] = await Promise.all([
+        this.prisma.inspection.findFirst({ where: { contractId, type: 'delivery' }, orderBy: { performedAt: 'desc' } }),
+        this.prisma.inspection.findFirst({ where: { contractId, type: 'return' }, orderBy: { performedAt: 'desc' } }),
+        this.prisma.cautionInstallment.findMany({ where: { contractId }, orderBy: { dueDate: 'asc' } }),
+      ]);
+
+      return this.pdfService.renderProtectedContract({
+        contractId: contract.id,
+        company: {
+          name: contract.company.name,
+          tradeName: contract.company.tradeName,
+          cnpj: contract.company.cnpj,
+          addressStreet: contract.company.addressStreet,
+          addressNumber: contract.company.addressNumber,
+          addressNeighborhood: contract.company.addressNeighborhood,
+          addressCity: contract.company.addressCity,
+          addressState: contract.company.addressState,
+        },
+        customer: {
+          name: contract.customer.name,
+          document: contract.customer.document,
+          documentType: contract.customer.documentType,
+          identityNumber: contract.customer.identityNumber,
+          driverLicenseNumber: contract.customer.driverLicenseNumber,
+          address: contract.customer.address,
+        },
+        vehicle: {
+          plate: contract.vehicle.plate,
+          brand: contract.vehicle.brand,
+          model: contract.vehicle.model,
+          modelYear: contract.vehicle.modelYear,
+          manufactureYear: contract.vehicle.manufactureYear,
+          renavam: contract.vehicle.renavam,
+          chassis: contract.vehicle.chassis,
+          fipeValue: contract.vehicle.fipeValue?.toString() ?? null,
+        },
+        contract: {
+          startDate: contract.startDate,
+          endDate: contract.endDate,
+          monthlyKmLimit: contract.monthlyKmLimitSnapshot,
+          extraKmRate: contract.extraKmRateSnapshot?.toString() ?? null,
+          cautionAmount: contract.cautionAmountSnapshot?.toString() ?? null,
+          createdAt: contract.createdAt,
+        },
+        signature:
+          contract.signature?.signedAt && contract.signature.termsHash
+            ? {
+                signedAt: contract.signature.signedAt,
+                signerIp: contract.signature.signerIp,
+                termsHash: contract.signature.termsHash,
+              }
+            : null,
+        inspections: {
+          delivery: deliveryInspection
+            ? {
+                performedAt: deliveryInspection.performedAt,
+                odometerKm: deliveryInspection.odometerKm,
+                fuelLevel: deliveryInspection.fuelLevel,
+                exteriorNotes: deliveryInspection.exteriorNotes,
+              }
+            : null,
+          return: returnInspection
+            ? {
+                performedAt: returnInspection.performedAt,
+                odometerKm: returnInspection.odometerKm,
+                fuelLevel: returnInspection.fuelLevel,
+                exteriorNotes: returnInspection.exteriorNotes,
+              }
+            : null,
+        },
+        cautionInstallments: cautionInstallments.map((i: { dueDate: Date; amount: { toString(): string } }) => ({
+          dueDate: i.dueDate,
+          amount: i.amount.toString(),
+        })),
+      });
+    }
+
     return this.pdfService.render({
       company: {
         name: contract.company.name,

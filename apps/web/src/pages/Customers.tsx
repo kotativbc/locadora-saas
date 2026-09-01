@@ -89,6 +89,7 @@ export function Customers() {
 function NewCustomerForm({ onCreated }: { onCreated: () => void }) {
   const [name, setName] = useState('');
   const [document, setDocument] = useState('');
+  const [identityNumber, setIdentityNumber] = useState('');
   const [documentType, setDocumentType] = useState<'CPF' | 'CNPJ'>('CPF');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -111,6 +112,7 @@ function NewCustomerForm({ onCreated }: { onCreated: () => void }) {
         name,
         document,
         documentType,
+        identityNumber: identityNumber || undefined,
         email: email || undefined,
         phone: phone || undefined,
         address: address || undefined,
@@ -150,6 +152,10 @@ function NewCustomerForm({ onCreated }: { onCreated: () => void }) {
         <div className="field">
           <label>{documentType}</label>
           <input required value={document} onChange={(e) => setDocument(e.target.value)} />
+        </div>
+        <div className="field">
+          <label>RG/Identidade (opcional)</label>
+          <input value={identityNumber} onChange={(e) => setIdentityNumber(e.target.value)} />
         </div>
         <div className="field">
           <label>E-mail (opcional)</label>
