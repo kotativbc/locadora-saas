@@ -32,6 +32,13 @@ export class FinesService {
       }
       contractCustomerId = contract.customerId;
     }
+    if (dto.customerId && !contractCustomerId) {
+      const customer = await this.prisma.customer.findUnique({ where: { id: dto.customerId } });
+      if (!customer || customer.companyId !== actor.companyId) {
+        throw new NotFoundException('Cliente não encontrado nesta empresa.');
+      }
+    }
+    const resolvedCustomerId = contractCustomerId ?? dto.customerId;
 
     const fine = await this.prisma.fine.create({
       data: {
@@ -59,7 +66,7 @@ export class FinesService {
     if (dto.chargeToCustomer) {
       await this.chargeGenerator.createAutoCharge({
         companyId: actor.companyId,
-        customerId: contractCustomerId,
+        customerId: resolvedCustomerId,
         contractId: dto.contractId,
         type: 'fine',
         description: `Multa — ${dto.description}`,

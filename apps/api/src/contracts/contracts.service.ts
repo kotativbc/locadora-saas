@@ -9,9 +9,13 @@ import * as crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../common/audit-log.service';
 import { ContractPdfService } from './pdf/contract-pdf.service';
+import { ChargeGeneratorService } from '../finance/charge-generator.service';
 import { CreateContractDto } from './dto/create-contract.dto';
 import { CreateCautionInstallmentDto } from './dto/create-caution-installment.dto';
 import { UpdateCautionInstallmentDto } from './dto/update-caution-installment.dto';
+import { CreateRentInstallmentDto } from './dto/create-rent-installment.dto';
+import { CreateMaintenanceReportDto } from './dto/create-maintenance-report.dto';
+import { UpdateMaintenanceReportDto } from './dto/update-maintenance-report.dto';
 import { RequestUser } from '../auth/types';
 
 const SIGNATURE_LINK_TTL_HOURS = 48;
@@ -27,6 +31,7 @@ export class ContractsService {
     private readonly prisma: PrismaService,
     private readonly auditLog: AuditLogService,
     private readonly pdfService: ContractPdfService,
+    private readonly chargeGenerator: ChargeGeneratorService,
   ) {}
 
   async create(dto: CreateContractDto, actor: RequestUser) {
@@ -235,6 +240,142 @@ export class ContractsService {
     return { deleted: true };
   }
 
+  // ---------- Parcelas de aluguel (cronograma semanal — Motorista de App) ----------
+  // Só pode ser alterado ANTES da assinatura: na assinatura, o cronograma é
+  // "congelado" em lançamentos financeiros individuais (public-signatures.service.ts).
+
+  private assertContractNotYetSigned(contract: { status: string }) {
+    if (contract.status !== 'draft' && contract.status !== 'awaiting_signature') {
+      throw new BadRequestException(
+        'Este contrato já foi assinado — o cronograma de pagamento não pode mais ser alterado (os lançamentos já foram gerados).',
+      );
+    }
+  }
+
+  async listRentInstallments(contractId: string, actor: RequestUser) {
+    await this.findAndAssertSameCompany(contractId, actor);
+    return this.prisma.rentInstallment.findMany({ where: { contractId }, orderBy: { dueDate: 'asc' } });
+  }
+
+  async addRentInstallment(contractId: string, dto: CreateRentInstallmentDto, actor: RequestUser) {
+    const contract = await this.findAndAssertSameCompany(contractId, actor);
+    this.assertContractNotYetSigned(contract);
+    const installment = await this.prisma.rentInstallment.create({
+      data: { contractId, dueDate: new Date(dto.dueDate), amount: dto.amount },
+    });
+    await this.auditLog.record({
+      action: 'contract.rent_installment_added',
+      userId: actor.id,
+      companyId: actor.companyId,
+      entityType: 'RentInstallment',
+      entityId: installment.id,
+      metadata: { contractId, amount: dto.amount, dueDate: dto.dueDate },
+    });
+    return installment;
+  }
+
+  async removeRentInstallment(contractId: string, installmentId: string, actor: RequestUser) {
+    const contract = await this.findAndAssertSameCompany(contractId, actor);
+    this.assertContractNotYetSigned(contract);
+    const installment = await this.prisma.rentInstallment.findUnique({ where: { id: installmentId } });
+    if (!installment || installment.contractId !== contractId) {
+      throw new NotFoundException('Parcela não encontrada neste contrato.');
+    }
+    await this.prisma.rentInstallment.delete({ where: { id: installmentId } });
+    return { deleted: true };
+  }
+
+  // ---------- Sinalização de manutenção (link público + registro manual) ----------
+
+  /** Gera (na primeira vez) ou retorna o link público existente pro cliente sinalizar problema. */
+  async getOrCreateMaintenanceReportLink(id: string, actor: RequestUser) {
+    const contract = await this.findAndAssertSameCompany(id, actor);
+    if (contract.maintenanceReportToken) {
+      return { token: contract.maintenanceReportToken };
+    }
+    const token = crypto.randomBytes(24).toString('hex');
+    await this.prisma.contract.update({ where: { id }, data: { maintenanceReportToken: token } });
+    await this.auditLog.record({
+      action: 'contract.maintenance_report_link_created',
+      userId: actor.id,
+      companyId: actor.companyId,
+      entityType: 'Contract',
+      entityId: id,
+    });
+    return { token };
+  }
+
+  async listMaintenanceReports(contractId: string, actor: RequestUser) {
+    await this.findAndAssertSameCompany(contractId, actor);
+    return this.prisma.maintenanceReport.findMany({ where: { contractId }, orderBy: { reportedAt: 'desc' } });
+  }
+
+  /** Registro manual — pra quando o cliente avisa por telefone/mensagem em vez de usar o link. */
+  async addMaintenanceReport(contractId: string, dto: CreateMaintenanceReportDto, actor: RequestUser) {
+    const contract = await this.findAndAssertSameCompany(contractId, actor);
+    const report = await this.prisma.maintenanceReport.create({
+      data: {
+        companyId: contract.companyId,
+        contractId,
+        description: dto.description,
+        reportedByCustomer: false,
+      },
+    });
+    await this.auditLog.record({
+      action: 'contract.maintenance_report_added_by_staff',
+      userId: actor.id,
+      companyId: actor.companyId,
+      entityType: 'MaintenanceReport',
+      entityId: report.id,
+    });
+    return report;
+  }
+
+  async updateMaintenanceReportStatus(
+    contractId: string,
+    reportId: string,
+    dto: UpdateMaintenanceReportDto,
+    actor: RequestUser,
+  ) {
+    await this.findAndAssertSameCompany(contractId, actor);
+    const report = await this.prisma.maintenanceReport.findUnique({ where: { id: reportId } });
+    if (!report || report.contractId !== contractId) {
+      throw new NotFoundException('Sinalização não encontrada neste contrato.');
+    }
+    return this.prisma.maintenanceReport.update({ where: { id: reportId }, data: { status: dto.status } });
+  }
+
+  /**
+   * Confirma a cobrança da multa de devolução antecipada sugerida pela
+   * vistoria de devolução. Recalcula do zero a partir dos dados do contrato
+   * (não confia em valor vindo do cliente) — evita manipulação do valor.
+   */
+  async chargeEarlyReturnPenalty(contractId: string, actor: RequestUser) {
+    const contract = await this.findAndAssertSameCompany(contractId, actor);
+    if (!contract.returnedAt) {
+      throw new BadRequestException('Este contrato ainda não teve devolução registrada.');
+    }
+    if (contract.returnedAt.getTime() >= contract.endDate.getTime()) {
+      throw new BadRequestException('Este contrato não teve devolução antecipada — nada a cobrar aqui.');
+    }
+
+    const totalDays = daysBetween(contract.startDate, contract.endDate);
+    const daysRemaining = daysBetween(contract.returnedAt, contract.endDate);
+    const remainingValue = (Number(contract.totalValue) / totalDays) * daysRemaining;
+    const penalty = (remainingValue * 0.1).toFixed(2);
+
+    const charge = await this.chargeGenerator.createAutoCharge({
+      companyId: contract.companyId,
+      customerId: contract.customerId,
+      contractId: contract.id,
+      type: 'other',
+      description: `Multa por devolução antecipada — contrato ${contract.id.slice(0, 8)} (${daysRemaining} dia(s) restante(s))`,
+      amount: penalty,
+    });
+
+    return charge;
+  }
+
   /** Gera (ou renova) o link público de assinatura de um contrato em rascunho. */
   async createSignatureLink(id: string, actor: RequestUser) {
     const contract = await this.findAndAssertSameCompany(id, actor);
@@ -277,9 +418,10 @@ export class ContractsService {
     });
 
     if (contract.templateType === 'monthly_app_driver') {
-      const [deliveryInspection, returnInspection] = await Promise.all([
+      const [deliveryInspection, returnInspection, rentInstallments] = await Promise.all([
         this.prisma.inspection.findFirst({ where: { contractId, type: 'delivery' }, orderBy: { performedAt: 'desc' } }),
         this.prisma.inspection.findFirst({ where: { contractId, type: 'return' }, orderBy: { performedAt: 'desc' } }),
+        this.prisma.rentInstallment.findMany({ where: { contractId }, orderBy: { dueDate: 'asc' } }),
       ]);
 
       return this.pdfService.renderMonthlyDriverContract({
@@ -353,6 +495,10 @@ export class ContractsService {
               }
             : null,
         },
+        rentInstallments: rentInstallments.map((i: { dueDate: Date; amount: { toString(): string } }) => ({
+          dueDate: i.dueDate,
+          amount: i.amount.toString(),
+        })),
       });
     }
 

@@ -6,7 +6,7 @@ interface AutoChargeInput {
   companyId: string;
   customerId?: string | null;
   contractId?: string | null;
-  type: 'rental' | 'damage' | 'fine';
+  type: 'rental' | 'damage' | 'fine' | 'other';
   description: string;
   amount: string;
   dueDate?: Date | null;

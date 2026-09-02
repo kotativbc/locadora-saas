@@ -97,15 +97,37 @@ export class PublicSignaturesService {
     });
 
     // Lançamento financeiro do aluguel — nasce automaticamente na assinatura.
-    await this.chargeGenerator.createAutoCharge({
-      companyId: c.companyId,
-      customerId: c.customerId,
-      contractId: c.id,
-      type: 'rental',
-      description: `Locação — contrato ${c.id.slice(0, 8)}`,
-      amount: c.totalValue.toString(),
-      dueDate: c.endDate,
+    // Se existir cronograma de parcelas definido (RentInstallment), gera um
+    // lançamento por parcela em vez de um único do valor total — mesma soma,
+    // só parcelada. Sem cronograma, mantém o comportamento de sempre.
+    const rentInstallments = await this.prisma.rentInstallment.findMany({
+      where: { contractId: c.id },
+      orderBy: { dueDate: 'asc' },
     });
+
+    if (rentInstallments.length > 0) {
+      for (const [index, installment] of rentInstallments.entries()) {
+        await this.chargeGenerator.createAutoCharge({
+          companyId: c.companyId,
+          customerId: c.customerId,
+          contractId: c.id,
+          type: 'rental',
+          description: `Locação — contrato ${c.id.slice(0, 8)} — parcela ${index + 1}/${rentInstallments.length}`,
+          amount: installment.amount.toString(),
+          dueDate: installment.dueDate,
+        });
+      }
+    } else {
+      await this.chargeGenerator.createAutoCharge({
+        companyId: c.companyId,
+        customerId: c.customerId,
+        contractId: c.id,
+        type: 'rental',
+        description: `Locação — contrato ${c.id.slice(0, 8)}`,
+        amount: c.totalValue.toString(),
+        dueDate: c.endDate,
+      });
+    }
 
     return { signedAt, termsHash };
   }

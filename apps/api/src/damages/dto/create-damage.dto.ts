@@ -10,6 +10,10 @@ export class CreateDamageDto {
 
   @IsOptional()
   @IsUUID()
+  customerId?: string;
+
+  @IsOptional()
+  @IsUUID()
   inspectionId?: string;
 
   @IsString()

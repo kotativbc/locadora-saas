@@ -32,6 +32,13 @@ export class DamagesService {
       }
       contractCustomerId = contract.customerId;
     }
+    if (dto.customerId && !contractCustomerId) {
+      const customer = await this.prisma.customer.findUnique({ where: { id: dto.customerId } });
+      if (!customer || customer.companyId !== actor.companyId) {
+        throw new NotFoundException('Cliente não encontrado nesta empresa.');
+      }
+    }
+    const resolvedCustomerId = contractCustomerId ?? dto.customerId;
 
     const damage = await this.prisma.damage.create({
       data: {
@@ -58,7 +65,7 @@ export class DamagesService {
     if (dto.chargeToCustomer && dto.estimatedCost) {
       await this.chargeGenerator.createAutoCharge({
         companyId: actor.companyId,
-        customerId: contractCustomerId,
+        customerId: resolvedCustomerId,
         contractId: dto.contractId,
         type: 'damage',
         description: `Avaria — ${dto.description}`,

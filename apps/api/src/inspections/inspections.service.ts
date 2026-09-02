@@ -4,6 +4,11 @@ import { AuditLogService } from '../common/audit-log.service';
 import { CreateInspectionDto } from './dto/create-inspection.dto';
 import { RequestUser } from '../auth/types';
 
+function daysBetween(start: Date, end: Date): number {
+  const ms = end.getTime() - start.getTime();
+  return Math.max(1, Math.ceil(ms / (1000 * 60 * 60 * 24)));
+}
+
 @Injectable()
 export class InspectionsService {
   constructor(
@@ -86,7 +91,18 @@ export class InspectionsService {
       metadata: { inspectionId: inspection.id, odometerKm: dto.odometerKm },
     });
 
-    return inspection;
+    // Devolução antecipada — sinaliza a multa sugerida (10% do valor
+    // proporcional aos dias não usados), mas não cobra sozinho: quem decide
+    // se cobra é a equipe, via endpoint separado.
+    let earlyReturn: { daysRemaining: number; suggestedPenalty: string } | null = null;
+    if (dto.type === 'return' && performedAt.getTime() < contract.endDate.getTime()) {
+      const totalDays = daysBetween(contract.startDate, contract.endDate);
+      const daysRemaining = daysBetween(performedAt, contract.endDate);
+      const remainingValue = (Number(contract.totalValue) / totalDays) * daysRemaining;
+      earlyReturn = { daysRemaining, suggestedPenalty: (remainingValue * 0.1).toFixed(2) };
+    }
+
+    return { ...inspection, earlyReturn };
   }
 
   async findAllForContract(contractId: string, actor: RequestUser) {

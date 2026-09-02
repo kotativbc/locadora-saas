@@ -4,6 +4,9 @@ import { ContractsService } from './contracts.service';
 import { CreateContractDto } from './dto/create-contract.dto';
 import { CreateCautionInstallmentDto } from './dto/create-caution-installment.dto';
 import { UpdateCautionInstallmentDto } from './dto/update-caution-installment.dto';
+import { CreateRentInstallmentDto } from './dto/create-rent-installment.dto';
+import { CreateMaintenanceReportDto } from './dto/create-maintenance-report.dto';
+import { UpdateMaintenanceReportDto } from './dto/update-maintenance-report.dto';
 import { RequirePermissions } from '../rbac/permissions.decorator';
 import { PermissionCode } from '../rbac/rbac.constants';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -75,5 +78,66 @@ export class ContractsController {
     @CurrentUser() actor: RequestUser,
   ) {
     return this.contractsService.removeCautionInstallment(id, installmentId, actor);
+  }
+
+  // ---------- Parcelas de aluguel (cronograma semanal) ----------
+
+  @Get(':id/rent-installments')
+  listRentInstallments(@Param('id') id: string, @CurrentUser() actor: RequestUser) {
+    return this.contractsService.listRentInstallments(id, actor);
+  }
+
+  @Post(':id/rent-installments')
+  addRentInstallment(
+    @Param('id') id: string,
+    @Body() dto: CreateRentInstallmentDto,
+    @CurrentUser() actor: RequestUser,
+  ) {
+    return this.contractsService.addRentInstallment(id, dto, actor);
+  }
+
+  @Delete(':id/rent-installments/:installmentId')
+  removeRentInstallment(
+    @Param('id') id: string,
+    @Param('installmentId') installmentId: string,
+    @CurrentUser() actor: RequestUser,
+  ) {
+    return this.contractsService.removeRentInstallment(id, installmentId, actor);
+  }
+
+  // ---------- Sinalização de manutenção ----------
+
+  @Post(':id/maintenance-report-link')
+  getOrCreateMaintenanceReportLink(@Param('id') id: string, @CurrentUser() actor: RequestUser) {
+    return this.contractsService.getOrCreateMaintenanceReportLink(id, actor);
+  }
+
+  @Get(':id/maintenance-reports')
+  listMaintenanceReports(@Param('id') id: string, @CurrentUser() actor: RequestUser) {
+    return this.contractsService.listMaintenanceReports(id, actor);
+  }
+
+  @Post(':id/maintenance-reports')
+  addMaintenanceReport(
+    @Param('id') id: string,
+    @Body() dto: CreateMaintenanceReportDto,
+    @CurrentUser() actor: RequestUser,
+  ) {
+    return this.contractsService.addMaintenanceReport(id, dto, actor);
+  }
+
+  @Patch(':id/maintenance-reports/:reportId')
+  updateMaintenanceReportStatus(
+    @Param('id') id: string,
+    @Param('reportId') reportId: string,
+    @Body() dto: UpdateMaintenanceReportDto,
+    @CurrentUser() actor: RequestUser,
+  ) {
+    return this.contractsService.updateMaintenanceReportStatus(id, reportId, dto, actor);
+  }
+
+  @Post(':id/early-return-penalty')
+  chargeEarlyReturnPenalty(@Param('id') id: string, @CurrentUser() actor: RequestUser) {
+    return this.contractsService.chargeEarlyReturnPenalty(id, actor);
   }
 }

@@ -14,6 +14,7 @@ const styles = StyleSheet.create({
   small: { fontSize: 8.5, color: '#666' },
   divider: { borderBottom: '1pt dashed #cccccc', marginVertical: 14 },
   checklistItem: { marginBottom: 4, lineHeight: 1.3 },
+  paymentRow: { flexDirection: 'row', marginBottom: 3 },
   blank: { borderBottom: '0.5pt solid #999', minWidth: 60 },
   signatureBox: {
     marginTop: 14,
@@ -76,6 +77,7 @@ export interface MonthlyDriverContractPdfData {
     delivery: { performedAt: Date; odometerKm: number; fuelLevel: string; exteriorNotes: string | null } | null;
     return: { performedAt: Date; odometerKm: number; fuelLevel: string; exteriorNotes: string | null } | null;
   };
+  rentInstallments: { dueDate: Date; amount: string }[];
 }
 
 function formatDate(d: Date) {
@@ -109,6 +111,7 @@ export function MonthlyDriverContractPdfDocument({
   contract,
   signature,
   inspections,
+  rentInstallments,
 }: MonthlyDriverContractPdfData) {
   const companyLabel = company.tradeName ?? company.name;
   const cityForo = company.addressCity ?? '[cidade não cadastrada]';
@@ -154,6 +157,20 @@ export function MonthlyDriverContractPdfDocument({
           {formatCurrency(contract.monthlyRate)}. Valor do KM excedente:{' '}
           {formatCurrency(contract.extraKmRate)}.
         </Text>
+
+        {rentInstallments.length > 0 && (
+          <>
+            <Text style={styles.clauseTitle}>CRONOGRAMA DE PAGAMENTO</Text>
+            <Text style={[styles.clause, { marginTop: -2 }]}>
+              O valor do aluguel mensal acima será pago nas seguintes datas:
+            </Text>
+            {rentInstallments.map((inst, i) => (
+              <Text key={i} style={styles.paymentRow}>
+                {formatDate(inst.dueDate)} – {formatCurrency(inst.amount)}
+              </Text>
+            ))}
+          </>
+        )}
 
         <Text style={styles.clauseTitle}>CLÁUSULA 1 — DO OBJETO E DA AUTORIZAÇÃO ESPECÍFICA DE USO</Text>
         <Text style={styles.clause}>

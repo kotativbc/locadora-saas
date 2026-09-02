@@ -252,9 +252,17 @@ export function ProtectedContractPdfDocument({
           LOCATÁRIO, além de multa penal de 35% do saldo restante e diárias em dobro até a recuperação do bem.
         </Text>
 
-        <Text style={styles.clauseTitle}>CLÁUSULA 7 — FORO DE ELEIÇÃO</Text>
+        <Text style={styles.clauseTitle}>CLÁUSULA 7 — DA DEVOLUÇÃO ANTECIPADA</Text>
         <Text style={styles.clause}>
-          7.1. As partes elegem expressamente o Foro da Comarca de {cityForo}
+          7.1. Caso o LOCATÁRIO devolva o VEÍCULO antes da data de término prevista neste contrato, incidirá multa
+          de 10% (dez por cento) sobre o valor correspondente ao período remanescente da locação, calculado
+          proporcionalmente aos dias não utilizados, sem prejuízo dos demais valores devidos até a data da efetiva
+          devolução.
+        </Text>
+
+        <Text style={styles.clauseTitle}>CLÁUSULA 8 — FORO DE ELEIÇÃO</Text>
+        <Text style={styles.clause}>
+          8.1. As partes elegem expressamente o Foro da Comarca de {cityForo}
           {stateForo ? `, ${stateForo}` : ''}, com exclusão expressa de qualquer outro, por mais privilegiado que
           seja, para dirimir quaisquer dúvidas ou litígios oriundos deste contrato.
         </Text>

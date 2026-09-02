@@ -8,6 +8,10 @@ export class CreateFineDto {
   @IsUUID()
   contractId?: string;
 
+  @IsOptional()
+  @IsUUID()
+  customerId?: string;
+
   @IsDateString()
   infractionDate!: string;
 
