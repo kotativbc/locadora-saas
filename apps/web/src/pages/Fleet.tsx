@@ -132,6 +132,7 @@ function NewVehicleForm({ onCreated }: { onCreated: () => void }) {
   const [color, setColor] = useState('');
   const [modelYear, setModelYear] = useState('');
   const [chassis, setChassis] = useState('');
+  const [renavam, setRenavam] = useState('');
   const [fipeValue, setFipeValue] = useState('');
   const [maintenanceIntervalKm, setMaintenanceIntervalKm] = useState('10000');
   const [error, setError] = useState<string | null>(null);
@@ -150,6 +151,7 @@ function NewVehicleForm({ onCreated }: { onCreated: () => void }) {
         color: color || undefined,
         modelYear: modelYear ? Number(modelYear) : undefined,
         chassis: chassis || undefined,
+        renavam: renavam || undefined,
         fipeValue: fipeValue || undefined,
         maintenanceIntervalKm: maintenanceIntervalKm ? Number(maintenanceIntervalKm) : undefined,
       });
@@ -202,6 +204,10 @@ function NewVehicleForm({ onCreated }: { onCreated: () => void }) {
         <div className="field">
           <label>Chassi</label>
           <input value={chassis} onChange={(e) => setChassis(e.target.value)} />
+        </div>
+        <div className="field">
+          <label>Renavam</label>
+          <input value={renavam} onChange={(e) => setRenavam(e.target.value)} />
         </div>
         <div className="field">
           <label>Valor Tabela FIPE (R$)</label>

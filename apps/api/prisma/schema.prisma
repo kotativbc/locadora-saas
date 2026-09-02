@@ -54,6 +54,7 @@ model Company {
   expenses      Expense[]
   statusEvents  CompanyStatusEvent[]
   termsAcceptances TermsAcceptance[]
+  maintenanceReports MaintenanceReport[]
 
   @@map("companies")
 }
@@ -398,6 +399,7 @@ model Contract {
   status            String    @default("draft") // draft | awaiting_signature | active | completed | cancelled
   deliveredAt       DateTime? // preenchido ao registrar a vistoria de entrega
   returnedAt        DateTime? // preenchido ao registrar a vistoria de devolução
+  maintenanceReportToken String? @unique // link público pro cliente sinalizar problema, sem precisar logar
   createdByUserId   String?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
@@ -409,12 +411,52 @@ model Contract {
   fines       Fine[]
   charges     Charge[]
   cautionInstallments CautionInstallment[]
+  rentInstallments    RentInstallment[]
+  maintenanceReports  MaintenanceReport[]
 
   @@index([companyId])
   @@index([customerId])
   @@index([vehicleId])
   @@map("contracts")
 }
+
+/// Parcela do cronograma de pagamento do ALUGUEL em si (não confundir com
+/// CautionInstallment, que é a caução) — usado no Motorista de Aplicativo
+/// pra mostrar/cobrar em datas semanais em vez de um valor mensal único.
+/// Só pode ser definido ANTES da assinatura: na assinatura, se existir
+/// cronograma, o sistema gera um lançamento por parcela em vez do único
+/// lançamento do valor total (mesma soma, só parcelado).
+model RentInstallment {
+  id         String   @id @default(uuid())
+  contractId String
+  contract   Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  dueDate    DateTime
+  amount     Decimal  @db.Decimal(10, 2)
+  createdAt  DateTime @default(now())
+
+  @@index([contractId])
+  @@map("rent_installments")
+}
+
+/// Sinalização de manutenção feita pelo próprio cliente durante a locação,
+/// via link público (maintenanceReportToken), sem precisar de login — ou
+/// registrada manualmente pela equipe se o cliente ligar/mandar mensagem.
+model MaintenanceReport {
+  id          String   @id @default(uuid())
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contractId  String
+  contract    Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  description String
+  status      String   @default("open") // open | acknowledged | resolved
+  reportedByCustomer Boolean @default(true) // false = equipe quem registrou
+  reportedAt  DateTime @default(now())
+
+  @@index([contractId])
+  @@index([companyId])
+  @@map("maintenance_reports")
+}
+
 
 /// Parcela negociada da caução (Anexo II) — cronograma manual, cada parcela
 /// pode ter valor diferente (não é uma divisão automática/igual). Puramente
