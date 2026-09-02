@@ -350,17 +350,25 @@ a {
 }
 
 .field input,
-.field select {
+.field select,
+.field textarea {
   padding: 9px 11px;
   border: 1px solid var(--rtv-line-strong);
   border-radius: var(--radius-sm);
   background: var(--rtv-surface);
   color: var(--rtv-ink-900);
   transition: border-color 0.12s ease, box-shadow 0.12s ease;
+  font-family: inherit;
+  font-size: inherit;
+}
+
+.field textarea {
+  resize: vertical;
 }
 
 .field input:focus,
-.field select:focus {
+.field select:focus,
+.field textarea:focus {
   border-color: var(--rtv-amber-500);
   box-shadow: 0 0 0 3px rgba(224, 138, 60, 0.15);
   outline: none;

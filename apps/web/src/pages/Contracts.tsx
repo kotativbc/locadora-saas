@@ -75,6 +75,8 @@ export function Contracts() {
     null,
   );
   const [installmentsTarget, setInstallmentsTarget] = useState<Contract | null>(null);
+  const [rentScheduleTarget, setRentScheduleTarget] = useState<Contract | null>(null);
+  const [reportsTarget, setReportsTarget] = useState<Contract | null>(null);
 
   async function load() {
     setLoading(true);
@@ -252,6 +254,34 @@ export function Contracts() {
                         Parcelas da caução
                       </button>
                     )}
+                    {c.templateType === 'monthly_app_driver' && c.status === 'draft' && (
+                      <button
+                        className="logout-btn"
+                        style={{ color: 'var(--primary)', borderColor: 'var(--border)' }}
+                        onClick={() => setRentScheduleTarget(c)}
+                      >
+                        Cronograma de pagamento
+                      </button>
+                    )}
+                    {c.templateType === 'monthly_app_driver' && c.status === 'active' && (
+                      <button
+                        className="logout-btn"
+                        style={{ color: 'var(--ink-muted)', borderColor: 'var(--border)' }}
+                        disabled
+                        title="Contrato já assinado — o cronograma não pode mais ser alterado"
+                      >
+                        Cronograma (assinado)
+                      </button>
+                    )}
+                    {(c.status === 'active' || c.status === 'completed') && (
+                      <button
+                        className="logout-btn"
+                        style={{ color: 'var(--primary)', borderColor: 'var(--border)' }}
+                        onClick={() => setReportsTarget(c)}
+                      >
+                        Sinalizações
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -274,6 +304,14 @@ export function Contracts() {
 
       {installmentsTarget && (
         <CautionInstallmentsPanel contract={installmentsTarget} onClose={() => setInstallmentsTarget(null)} />
+      )}
+
+      {rentScheduleTarget && (
+        <RentInstallmentsPanel contract={rentScheduleTarget} onClose={() => setRentScheduleTarget(null)} />
+      )}
+
+      {reportsTarget && (
+        <MaintenanceReportsPanel contract={reportsTarget} onClose={() => setReportsTarget(null)} />
       )}
 
       {formOpen && (
@@ -524,6 +562,277 @@ interface CautionInstallment {
   paidAt: string | null;
 }
 
+function MaintenanceReportsPanel({ contract, onClose }: { contract: Contract; onClose: () => void }) {
+  const [reports, setReports] = useState<
+    { id: string; description: string; status: string; reportedByCustomer: boolean; reportedAt: string }[]
+  >([]);
+  const [loading, setLoading] = useState(true);
+  const [link, setLink] = useState<string | null>(null);
+  const [generatingLink, setGeneratingLink] = useState(false);
+  const [description, setDescription] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function load() {
+    setLoading(true);
+    try {
+      setReports(await api.get(`/contracts/${contract.id}/maintenance-reports`));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erro ao carregar sinalizações.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contract.id]);
+
+  async function handleGenerateLink() {
+    setGeneratingLink(true);
+    setError(null);
+    try {
+      const result = await api.post<{ token: string }>(`/contracts/${contract.id}/maintenance-report-link`);
+      setLink(`${window.location.origin}/sinalizar/${result.token}`);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erro ao gerar o link.');
+    } finally {
+      setGeneratingLink(false);
+    }
+  }
+
+  async function handleAdd(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    try {
+      await api.post(`/contracts/${contract.id}/maintenance-reports`, { description });
+      setDescription('');
+      load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erro ao registrar sinalização.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleStatusChange(reportId: string, status: string) {
+    try {
+      await api.patch(`/contracts/${contract.id}/maintenance-reports/${reportId}`, { status });
+      load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erro ao atualizar status.');
+    }
+  }
+
+  const STATUS_LABELS: Record<string, string> = { open: 'Aberta', acknowledged: 'Vista', resolved: 'Resolvida' };
+
+  return (
+    <div className="card">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+        <h3 style={{ margin: 0 }}>Sinalizações de manutenção — {contract.customer.name}</h3>
+        <button type="button" className="logout-btn" style={{ color: 'var(--ink-muted)', borderColor: 'var(--border)' }} onClick={onClose}>
+          Fechar
+        </button>
+      </div>
+      <p style={{ fontSize: 12, color: 'var(--ink-muted)', marginTop: 0, marginBottom: 14 }}>
+        O cliente pode avisar diretamente pelo link público, sem precisar logar — ou você registra manualmente se
+        ele avisar por telefone/mensagem.
+      </p>
+
+      {error && <div className="error-banner">{error}</div>}
+
+      <div style={{ marginBottom: 16 }}>
+        {link ? (
+          <div className="field" style={{ marginBottom: 0 }}>
+            <label>Link pro cliente</label>
+            <input readOnly value={link} onClick={(e) => (e.target as HTMLInputElement).select()} />
+          </div>
+        ) : (
+          <button className="logout-btn" style={{ color: 'var(--primary)', borderColor: 'var(--border)' }} disabled={generatingLink} onClick={handleGenerateLink}>
+            {generatingLink ? 'Gerando...' : 'Gerar link público pro cliente'}
+          </button>
+        )}
+      </div>
+
+      {loading ? (
+        <p>Carregando...</p>
+      ) : reports.length === 0 ? (
+        <p style={{ fontSize: 13, color: 'var(--ink-muted)' }}>Nenhuma sinalização registrada ainda.</p>
+      ) : (
+        <table style={{ marginBottom: 16 }}>
+          <thead>
+            <tr>
+              <th>Quando</th>
+              <th>Origem</th>
+              <th>Descrição</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {reports.map((r) => (
+              <tr key={r.id}>
+                <td>{new Date(r.reportedAt).toLocaleString('pt-BR')}</td>
+                <td>{r.reportedByCustomer ? 'Cliente' : 'Equipe'}</td>
+                <td>{r.description}</td>
+                <td>
+                  <select value={r.status} onChange={(e) => handleStatusChange(r.id, e.target.value)}>
+                    {Object.entries(STATUS_LABELS).map(([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
+      <form onSubmit={handleAdd} style={{ display: 'flex', gap: 10, alignItems: 'flex-end' }}>
+        <div className="field" style={{ marginBottom: 0, flex: 1 }}>
+          <label>Registrar manualmente (cliente avisou por telefone/mensagem)</label>
+          <input required value={description} onChange={(e) => setDescription(e.target.value)} placeholder="O que o cliente relatou" />
+        </div>
+        <button className="btn" type="submit" disabled={submitting}>
+          {submitting ? 'Salvando...' : 'Registrar'}
+        </button>
+      </form>
+    </div>
+  );
+}
+
+function RentInstallmentsPanel({ contract, onClose }: { contract: Contract; onClose: () => void }) {
+  const [installments, setInstallments] = useState<{ id: string; dueDate: string; amount: string }[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [dueDate, setDueDate] = useState('');
+  const [amount, setAmount] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function load() {
+    setLoading(true);
+    try {
+      setInstallments(await api.get(`/contracts/${contract.id}/rent-installments`));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erro ao carregar cronograma.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contract.id]);
+
+  async function handleAdd(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    try {
+      await api.post(`/contracts/${contract.id}/rent-installments`, { dueDate, amount });
+      setDueDate('');
+      setAmount('');
+      load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erro ao adicionar parcela.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleRemove(installmentId: string) {
+    try {
+      await api.delete(`/contracts/${contract.id}/rent-installments/${installmentId}`);
+      load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erro ao remover parcela.');
+    }
+  }
+
+  const total = installments.reduce((sum, i) => sum + Number(i.amount), 0);
+  const contractValue = Number(contract.totalValue);
+  const totalMatches = installments.length === 0 || Math.abs(total - contractValue) < 0.01;
+
+  return (
+    <div className="card">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+        <h3 style={{ margin: 0 }}>Cronograma de pagamento — {contract.customer.name}</h3>
+        <button type="button" className="logout-btn" style={{ color: 'var(--ink-muted)', borderColor: 'var(--border)' }} onClick={onClose}>
+          Fechar
+        </button>
+      </div>
+      <p style={{ fontSize: 12, color: 'var(--ink-muted)', marginTop: 0, marginBottom: 14 }}>
+        Define em quais datas o aluguel mensal ({formatCurrency(contract.totalValue)}) será cobrado, em vez de um
+        único lançamento no vencimento. Só pode ser alterado <strong>antes de assinar</strong> — na assinatura, os
+        lançamentos são gerados de acordo com o que estiver aqui.
+      </p>
+
+      {error && <div className="error-banner">{error}</div>}
+
+      {loading ? (
+        <p>Carregando...</p>
+      ) : (
+        <>
+          {installments.length > 0 && (
+            <table style={{ marginBottom: 12 }}>
+              <thead>
+                <tr>
+                  <th>Vencimento</th>
+                  <th>Valor</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {installments.map((i) => (
+                  <tr key={i.id}>
+                    <td>{new Date(i.dueDate).toLocaleDateString('pt-BR')}</td>
+                    <td>{formatCurrency(i.amount)}</td>
+                    <td>
+                      <button
+                        type="button"
+                        className="logout-btn"
+                        style={{ color: 'var(--rtv-danger)', borderColor: 'var(--border)', padding: '2px 10px' }}
+                        onClick={() => handleRemove(i.id)}
+                      >
+                        Remover
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          {installments.length > 0 && (
+            <p style={{ fontSize: 13, marginBottom: 16, color: totalMatches ? 'var(--ink-900)' : 'var(--rtv-danger)' }}>
+              <strong>
+                Total do cronograma: {formatCurrency(total.toFixed(2))} {!totalMatches && `(contrato: ${formatCurrency(contract.totalValue)} — não bate!)`}
+              </strong>
+            </p>
+          )}
+
+          <form onSubmit={handleAdd} style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>Vencimento</label>
+              <input required type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+            </div>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>Valor (R$)</label>
+              <input required type="number" step="0.01" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} />
+            </div>
+            <button className="btn" type="submit" disabled={submitting}>
+              {submitting ? 'Adicionando...' : '+ Adicionar parcela'}
+            </button>
+          </form>
+        </>
+      )}
+    </div>
+  );
+}
+
 function CautionInstallmentsPanel({ contract, onClose }: { contract: Contract; onClose: () => void }) {
   const [installments, setInstallments] = useState<CautionInstallment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -692,6 +1001,8 @@ function InspectionForm({
   const [exteriorNotes, setExteriorNotes] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [earlyReturn, setEarlyReturn] = useState<{ daysRemaining: number; suggestedPenalty: string } | null>(null);
+  const [chargingPenalty, setChargingPenalty] = useState(false);
 
   const lateDays =
     type === 'return'
@@ -703,19 +1014,73 @@ function InspectionForm({
     setError(null);
     setSubmitting(true);
     try {
-      await api.post('/inspections', {
-        contractId: contract.id,
-        type,
-        odometerKm: Number(odometerKm),
-        fuelLevel,
-        exteriorNotes: exteriorNotes || undefined,
-      });
-      onDone();
+      const result = await api.post<{ earlyReturn: { daysRemaining: number; suggestedPenalty: string } | null }>(
+        '/inspections',
+        {
+          contractId: contract.id,
+          type,
+          odometerKm: Number(odometerKm),
+          fuelLevel,
+          exteriorNotes: exteriorNotes || undefined,
+        },
+      );
+      if (result.earlyReturn) {
+        // Devolução antecipada — mostra a sugestão de multa em vez de fechar direto.
+        setEarlyReturn(result.earlyReturn);
+      } else {
+        onDone();
+      }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Erro ao registrar vistoria.');
     } finally {
       setSubmitting(false);
     }
+  }
+
+  async function handleChargePenalty(charge: boolean) {
+    if (!charge) {
+      onDone();
+      return;
+    }
+    setChargingPenalty(true);
+    setError(null);
+    try {
+      await api.post(`/contracts/${contract.id}/early-return-penalty`);
+      onDone();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erro ao gerar a cobrança da multa.');
+      setChargingPenalty(false);
+    }
+  }
+
+  if (earlyReturn) {
+    return (
+      <div className="card" style={{ borderColor: 'var(--accent)' }}>
+        <h3 style={{ marginTop: 0 }}>Devolução antecipada — {contract.vehicle.plate}</h3>
+        {error && <div className="error-banner">{error}</div>}
+        <p style={{ fontSize: 13.5 }}>
+          O veículo foi devolvido {earlyReturn.daysRemaining} dia(s) antes da data prevista no contrato. A cláusula
+          de devolução antecipada prevê multa de 10% sobre o valor proporcional aos dias não usados:
+        </p>
+        <p style={{ fontSize: 18, fontWeight: 700, margin: '4px 0 16px' }}>
+          {formatCurrency(earlyReturn.suggestedPenalty)}
+        </p>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn" disabled={chargingPenalty} onClick={() => handleChargePenalty(true)}>
+            {chargingPenalty ? 'Gerando...' : 'Cobrar esta multa'}
+          </button>
+          <button
+            type="button"
+            className="logout-btn"
+            style={{ color: 'var(--ink-muted)', borderColor: 'var(--border)' }}
+            disabled={chargingPenalty}
+            onClick={() => handleChargePenalty(false)}
+          >
+            Não cobrar
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (

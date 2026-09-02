@@ -18,6 +18,7 @@ import { Customers } from './pages/Customers';
 import { Rates } from './pages/Rates';
 import { Contracts } from './pages/Contracts';
 import { PublicSign } from './pages/PublicSign';
+import { PublicMaintenanceReport } from './pages/PublicMaintenanceReport';
 import { Maintenance } from './pages/Maintenance';
 import { Damages } from './pages/Damages';
 import { Claims } from './pages/Claims';
@@ -37,6 +38,7 @@ export function App() {
           <Route path="/esqueci-minha-senha" element={<ForgotPassword />} />
           <Route path="/redefinir-senha/:token" element={<ResetPassword />} />
           <Route path="/assinar/:token" element={<PublicSign />} />
+          <Route path="/sinalizar/:token" element={<PublicMaintenanceReport />} />
           <Route element={<RequireAuth />}>
             <Route element={<Layout />}>
               <Route path="/" element={<Home />} />
