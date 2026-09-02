@@ -1,12 +1,43 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Car, Users, FileText, BarChart3, Building2, History, TrendingUp } from 'lucide-react';
+import { Car, Users, FileText, BarChart3, Building2, History, TrendingUp, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { api, ApiError } from '../api';
+
+interface ChargeByType {
+  type: string;
+  count: number;
+  total: string;
+}
+
+interface RecentCharge {
+  id: string;
+  type: string;
+  description: string;
+  amount: string;
+  status: string;
+  createdAt: string;
+  customerName: string | null;
+  vehiclePlate: string | null;
+}
+
+interface RecentExpense {
+  id: string;
+  category: string;
+  description: string;
+  amount: string;
+  incurredAt: string;
+  vehicle: string | null;
+}
 
 interface FinancialSummary {
   totalReceivable: string;
   totalReceived: string;
+  totalExpenses: string;
+  balance: string;
+  chargesByType: ChargeByType[];
+  recentCharges: RecentCharge[];
+  recentExpenses: RecentExpense[];
   fleetSize: number;
   activeContracts: number;
 }
@@ -19,6 +50,20 @@ interface Company {
 function formatCurrency(value: string) {
   return Number(value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
+
+const TYPE_LABELS: Record<string, string> = {
+  rental: 'Aluguel',
+  damage: 'Avaria',
+  fine: 'Multa',
+  other: 'Outro',
+};
+
+const CATEGORY_LABELS: Record<string, string> = {
+  maintenance: 'Manutenção',
+  fuel: 'Combustível',
+  insurance: 'Seguro',
+  other: 'Outra',
+};
 
 const QUICK_ACTIONS: { to: string; label: string; icon: typeof Car; permission: string }[] = [
   { to: '/empresas', label: 'Ver empresas', icon: Building2, permission: 'platform.manage' },
@@ -54,6 +99,37 @@ export function Home() {
 
   const actions = QUICK_ACTIONS.filter((a) => hasPermission(a.permission));
 
+  // Junta lançamentos e despesas recentes numa única linha do tempo, mais recente primeiro.
+  type TimelineItem =
+    | { kind: 'charge'; id: string; date: string; description: string; label: string; origin: string | null; amount: string; status: string }
+    | { kind: 'expense'; id: string; date: string; description: string; label: string; origin: string | null; amount: string };
+
+  const timeline: TimelineItem[] = summary
+    ? [
+        ...summary.recentCharges.map((c): TimelineItem => ({
+          kind: 'charge',
+          id: c.id,
+          date: c.createdAt,
+          description: c.description,
+          label: TYPE_LABELS[c.type] ?? c.type,
+          origin: c.customerName ?? c.vehiclePlate,
+          amount: c.amount,
+          status: c.status,
+        })),
+        ...summary.recentExpenses.map((e): TimelineItem => ({
+          kind: 'expense',
+          id: e.id,
+          date: e.incurredAt,
+          description: e.description,
+          label: CATEGORY_LABELS[e.category] ?? e.category,
+          origin: e.vehicle,
+          amount: e.amount,
+        })),
+      ]
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+        .slice(0, 10)
+    : [];
+
   return (
     <div>
       <div className="page-header">
@@ -79,24 +155,95 @@ export function Home() {
       )}
 
       {summary && (
-        <div className="kpi-grid">
-          <div className="kpi-card">
-            <div className="kpi-card__label">A receber</div>
-            <div className="kpi-card__value">{formatCurrency(summary.totalReceivable)}</div>
+        <>
+          <div className="kpi-grid">
+            <div className="kpi-card">
+              <div className="kpi-card__label">A receber</div>
+              <div className="kpi-card__value">{formatCurrency(summary.totalReceivable)}</div>
+            </div>
+            <div className="kpi-card">
+              <div className="kpi-card__label">Recebido</div>
+              <div className="kpi-card__value kpi-card__value--success">{formatCurrency(summary.totalReceived)}</div>
+            </div>
+            <div className="kpi-card">
+              <div className="kpi-card__label">Despesas</div>
+              <div className="kpi-card__value" style={{ color: 'var(--rtv-danger)' }}>
+                {formatCurrency(summary.totalExpenses)}
+              </div>
+            </div>
+            <div className="kpi-card">
+              <div className="kpi-card__label">Saldo (recebido − despesas)</div>
+              <div
+                className="kpi-card__value"
+                style={{ color: Number(summary.balance) >= 0 ? 'var(--rtv-success)' : 'var(--rtv-danger)' }}
+              >
+                {formatCurrency(summary.balance)}
+              </div>
+            </div>
+            <div className="kpi-card">
+              <div className="kpi-card__label">Contratos ativos</div>
+              <div className="kpi-card__value">{summary.activeContracts}</div>
+            </div>
+            <div className="kpi-card">
+              <div className="kpi-card__label">Veículos na frota</div>
+              <div className="kpi-card__value">{summary.fleetSize}</div>
+            </div>
           </div>
-          <div className="kpi-card">
-            <div className="kpi-card__label">Recebido</div>
-            <div className="kpi-card__value kpi-card__value--success">{formatCurrency(summary.totalReceived)}</div>
-          </div>
-          <div className="kpi-card">
-            <div className="kpi-card__label">Contratos ativos</div>
-            <div className="kpi-card__value">{summary.activeContracts}</div>
-          </div>
-          <div className="kpi-card">
-            <div className="kpi-card__label">Veículos na frota</div>
-            <div className="kpi-card__value">{summary.fleetSize}</div>
-          </div>
-        </div>
+
+          {summary.chargesByType.length > 0 && (
+            <div className="card">
+              <strong style={{ display: 'block', marginBottom: 12, fontSize: 13 }}>Lançamentos por tipo</strong>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 20 }}>
+                {summary.chargesByType.map((c) => (
+                  <div key={c.type}>
+                    <div style={{ fontSize: 12, color: 'var(--ink-muted)' }}>
+                      {TYPE_LABELS[c.type] ?? c.type} ({c.count})
+                    </div>
+                    <div style={{ fontSize: 16, fontWeight: 700 }}>{formatCurrency(c.total)}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {timeline.length > 0 && (
+            <div className="card">
+              <strong style={{ display: 'block', marginBottom: 12, fontSize: 13 }}>Atividade financeira recente</strong>
+              <table>
+                <thead>
+                  <tr>
+                    <th></th>
+                    <th>Quando</th>
+                    <th>Descrição</th>
+                    <th>Categoria</th>
+                    <th>Origem</th>
+                    <th>Valor</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {timeline.map((item) => (
+                    <tr key={`${item.kind}-${item.id}`}>
+                      <td>
+                        {item.kind === 'charge' ? (
+                          <ArrowUpCircle size={15} color="var(--rtv-success)" />
+                        ) : (
+                          <ArrowDownCircle size={15} color="var(--rtv-danger)" />
+                        )}
+                      </td>
+                      <td>{new Date(item.date).toLocaleDateString('pt-BR')}</td>
+                      <td>{item.description}</td>
+                      <td>{item.label}</td>
+                      <td>{item.origin ?? '—'}</td>
+                      <td style={{ color: item.kind === 'charge' ? 'var(--rtv-success)' : 'var(--rtv-danger)' }}>
+                        {item.kind === 'charge' ? '+' : '−'} {formatCurrency(item.amount)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
       )}
 
       {actions.length > 0 && (

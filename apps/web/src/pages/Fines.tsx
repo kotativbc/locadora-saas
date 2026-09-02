@@ -10,6 +10,20 @@ interface Vehicle {
   model: string;
 }
 
+interface Customer {
+  id: string;
+  name: string;
+  document: string;
+}
+
+interface ContractOption {
+  id: string;
+  status: string;
+  vehicleId: string;
+  customer: { name: string };
+  vehicle: { plate: string };
+}
+
 interface Fine {
   id: string;
   infractionDate: string;
@@ -33,6 +47,8 @@ function formatCurrency(value: string) {
 export function Fines() {
   const [fines, setFines] = useState<Fine[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [contracts, setContracts] = useState<ContractOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -41,9 +57,16 @@ export function Fines() {
   async function load() {
     setLoading(true);
     try {
-      const [f, v] = await Promise.all([api.get<Fine[]>('/fines'), api.get<Vehicle[]>('/vehicles')]);
+      const [f, v, c, ct] = await Promise.all([
+        api.get<Fine[]>('/fines'),
+        api.get<Vehicle[]>('/vehicles'),
+        api.get<Customer[]>('/customers'),
+        api.get<ContractOption[]>('/contracts'),
+      ]);
       setFines(f);
       setVehicles(v);
+      setCustomers(c);
+      setContracts(ct);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Erro ao carregar multas.');
     } finally {
@@ -125,12 +148,24 @@ export function Fines() {
         )}
       </div>
 
-      {formOpen && <NewFineForm vehicles={vehicles} onCreated={() => { setFormOpen(false); load(); }} />}
+      {formOpen && (
+        <NewFineForm vehicles={vehicles} customers={customers} contracts={contracts} onCreated={() => { setFormOpen(false); load(); }} />
+      )}
     </div>
   );
 }
 
-function NewFineForm({ vehicles, onCreated }: { vehicles: Vehicle[]; onCreated: () => void }) {
+function NewFineForm({
+  vehicles,
+  customers,
+  contracts,
+  onCreated,
+}: {
+  vehicles: Vehicle[];
+  customers: Customer[];
+  contracts: ContractOption[];
+  onCreated: () => void;
+}) {
   const [vehicleId, setVehicleId] = useState(vehicles[0]?.id ?? '');
   const [infractionDate, setInfractionDate] = useState('');
   const [dueDate, setDueDate] = useState('');
@@ -138,8 +173,13 @@ function NewFineForm({ vehicles, onCreated }: { vehicles: Vehicle[]; onCreated: 
   const [description, setDescription] = useState('');
   const [documentNumber, setDocumentNumber] = useState('');
   const [chargeToCustomer, setChargeToCustomer] = useState(true);
+  const [linkMode, setLinkMode] = useState<'none' | 'contract' | 'customer'>('none');
+  const [contractId, setContractId] = useState('');
+  const [customerId, setCustomerId] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const relevantContracts = contracts.filter((c) => c.vehicleId === vehicleId && c.status === 'active');
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -148,6 +188,8 @@ function NewFineForm({ vehicles, onCreated }: { vehicles: Vehicle[]; onCreated: 
     try {
       await api.post('/fines', {
         vehicleId,
+        contractId: linkMode === 'contract' ? contractId || undefined : undefined,
+        customerId: linkMode === 'customer' ? customerId || undefined : undefined,
         infractionDate: new Date(infractionDate).toISOString(),
         dueDate: dueDate ? new Date(dueDate).toISOString() : undefined,
         amount,
@@ -205,12 +247,58 @@ function NewFineForm({ vehicles, onCreated }: { vehicles: Vehicle[]; onCreated: 
         <label>Nº do AIT/notificação (opcional)</label>
         <input value={documentNumber} onChange={(e) => setDocumentNumber(e.target.value)} />
       </div>
+
+      <div className="field-group">
+        <div className="field-group__label">Vínculo (opcional)</div>
+        <div className="field" style={{ marginBottom: linkMode === 'none' ? 0 : undefined }}>
+          <label>Atrelar a</label>
+          <select value={linkMode} onChange={(e) => setLinkMode(e.target.value as typeof linkMode)}>
+            <option value="none">Nada — só o veículo</option>
+            <option value="contract">Um contrato vigente</option>
+            <option value="customer">Um cliente direto (sem contrato)</option>
+          </select>
+        </div>
+        {linkMode === 'contract' && (
+          <div className="field" style={{ marginBottom: 0 }}>
+            <label>Contrato</label>
+            {relevantContracts.length === 0 ? (
+              <p style={{ fontSize: 12.5, color: 'var(--ink-muted)', margin: 0 }}>
+                Nenhum contrato ativo para este veículo.
+              </p>
+            ) : (
+              <select value={contractId} onChange={(e) => setContractId(e.target.value)}>
+                <option value="">Selecione...</option>
+                {relevantContracts.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.customer.name} — {c.vehicle.plate}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+        )}
+        {linkMode === 'customer' && (
+          <div className="field" style={{ marginBottom: 0 }}>
+            <label>Cliente</label>
+            <select value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
+              <option value="">Selecione...</option>
+              {customers.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name} — {c.document}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
+
       <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, marginBottom: 4 }}>
         <input type="checkbox" checked={chargeToCustomer} onChange={(e) => setChargeToCustomer(e.target.checked)} />
         Cobrar do cliente
       </label>
       <p style={{ fontSize: 12, color: 'var(--ink-muted)', marginTop: 0, marginBottom: 14 }}>
-        Se marcado, já cria um lançamento em Financeiro → Lançamentos.
+        Se marcado, já cria um lançamento em Financeiro → Lançamentos
+        {linkMode === 'none' ? ' — mas precisa de um contrato ou cliente vinculado acima pra saber quem cobrar' : ''}.
       </p>
       <button className="btn" type="submit" disabled={submitting}>
         {submitting ? 'Salvando...' : 'Registrar multa'}

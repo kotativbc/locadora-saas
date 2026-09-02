@@ -10,6 +10,20 @@ interface Vehicle {
   model: string;
 }
 
+interface Customer {
+  id: string;
+  name: string;
+  document: string;
+}
+
+interface ContractOption {
+  id: string;
+  status: string;
+  vehicleId: string;
+  customer: { name: string };
+  vehicle: { plate: string };
+}
+
 interface DamageRecord {
   id: string;
   description: string;
@@ -34,6 +48,8 @@ function formatCurrency(value: string) {
 export function Damages() {
   const [damages, setDamages] = useState<DamageRecord[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [contracts, setContracts] = useState<ContractOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -42,9 +58,16 @@ export function Damages() {
   async function load() {
     setLoading(true);
     try {
-      const [d, v] = await Promise.all([api.get<DamageRecord[]>('/damages'), api.get<Vehicle[]>('/vehicles')]);
+      const [d, v, c, ct] = await Promise.all([
+        api.get<DamageRecord[]>('/damages'),
+        api.get<Vehicle[]>('/vehicles'),
+        api.get<Customer[]>('/customers'),
+        api.get<ContractOption[]>('/contracts'),
+      ]);
       setDamages(d);
       setVehicles(v);
+      setCustomers(c);
+      setContracts(ct);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Erro ao carregar avarias.');
     } finally {
@@ -137,19 +160,36 @@ export function Damages() {
         )}
       </div>
 
-      {formOpen && <NewDamageForm vehicles={vehicles} onCreated={() => { setFormOpen(false); load(); }} />}
+      {formOpen && (
+        <NewDamageForm vehicles={vehicles} customers={customers} contracts={contracts} onCreated={() => { setFormOpen(false); load(); }} />
+      )}
     </div>
   );
 }
 
-function NewDamageForm({ vehicles, onCreated }: { vehicles: Vehicle[]; onCreated: () => void }) {
+function NewDamageForm({
+  vehicles,
+  customers,
+  contracts,
+  onCreated,
+}: {
+  vehicles: Vehicle[];
+  customers: Customer[];
+  contracts: ContractOption[];
+  onCreated: () => void;
+}) {
   const [vehicleId, setVehicleId] = useState(vehicles[0]?.id ?? '');
   const [description, setDescription] = useState('');
   const [severity, setSeverity] = useState<'minor' | 'moderate' | 'severe'>('minor');
   const [estimatedCost, setEstimatedCost] = useState('');
   const [chargeToCustomer, setChargeToCustomer] = useState(false);
+  const [linkMode, setLinkMode] = useState<'none' | 'contract' | 'customer'>('none');
+  const [contractId, setContractId] = useState('');
+  const [customerId, setCustomerId] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const relevantContracts = contracts.filter((c) => c.vehicleId === vehicleId && c.status === 'active');
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -158,6 +198,8 @@ function NewDamageForm({ vehicles, onCreated }: { vehicles: Vehicle[]; onCreated
     try {
       await api.post('/damages', {
         vehicleId,
+        contractId: linkMode === 'contract' ? contractId || undefined : undefined,
+        customerId: linkMode === 'customer' ? customerId || undefined : undefined,
         description,
         severity,
         estimatedCost: estimatedCost || undefined,
@@ -209,12 +251,58 @@ function NewDamageForm({ vehicles, onCreated }: { vehicles: Vehicle[]; onCreated
         <label>Custo estimado (R$, opcional)</label>
         <input type="number" step="0.01" min="0" value={estimatedCost} onChange={(e) => setEstimatedCost(e.target.value)} />
       </div>
+
+      <div className="field-group">
+        <div className="field-group__label">Vínculo (opcional)</div>
+        <div className="field" style={{ marginBottom: linkMode === 'none' ? 0 : undefined }}>
+          <label>Atrelar a</label>
+          <select value={linkMode} onChange={(e) => setLinkMode(e.target.value as typeof linkMode)}>
+            <option value="none">Nada — só o veículo</option>
+            <option value="contract">Um contrato vigente</option>
+            <option value="customer">Um cliente direto (sem contrato)</option>
+          </select>
+        </div>
+        {linkMode === 'contract' && (
+          <div className="field" style={{ marginBottom: 0 }}>
+            <label>Contrato</label>
+            {relevantContracts.length === 0 ? (
+              <p style={{ fontSize: 12.5, color: 'var(--ink-muted)', margin: 0 }}>
+                Nenhum contrato ativo para este veículo.
+              </p>
+            ) : (
+              <select value={contractId} onChange={(e) => setContractId(e.target.value)}>
+                <option value="">Selecione...</option>
+                {relevantContracts.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.customer.name} — {c.vehicle.plate}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+        )}
+        {linkMode === 'customer' && (
+          <div className="field" style={{ marginBottom: 0 }}>
+            <label>Cliente</label>
+            <select value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
+              <option value="">Selecione...</option>
+              {customers.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name} — {c.document}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
+
       <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, marginBottom: 4 }}>
         <input type="checkbox" checked={chargeToCustomer} onChange={(e) => setChargeToCustomer(e.target.checked)} />
         Cobrar do cliente
       </label>
       <p style={{ fontSize: 12, color: 'var(--ink-muted)', marginTop: 0, marginBottom: 14 }}>
-        Se marcado e houver custo estimado, já cria um lançamento em Financeiro → Lançamentos.
+        Se marcado e houver custo estimado, já cria um lançamento em Financeiro → Lançamentos
+        {linkMode === 'none' ? ' — mas precisa de um contrato ou cliente vinculado acima pra saber quem cobrar' : ''}.
       </p>
       <button className="btn" type="submit" disabled={submitting}>
         {submitting ? 'Salvando...' : 'Registrar avaria'}

@@ -14,33 +14,51 @@ export class ReportsService {
         totalExpenses: '0.00',
         balance: '0.00',
         chargesByType: [],
+        recentCharges: [],
+        recentExpenses: [],
         fleetSize: 0,
         activeContracts: 0,
       };
     }
 
-    const [pendingCharges, paidCharges, expenses, chargesByType, fleetSize, activeContracts] = await Promise.all([
-      this.prisma.charge.aggregate({
-        where: { companyId: actor.companyId, status: 'pending' },
-        _sum: { amount: true },
-      }),
-      this.prisma.charge.aggregate({
-        where: { companyId: actor.companyId, status: 'paid' },
-        _sum: { amount: true },
-      }),
-      this.prisma.expense.aggregate({
-        where: { companyId: actor.companyId },
-        _sum: { amount: true },
-      }),
-      this.prisma.charge.groupBy({
-        by: ['type'],
-        where: { companyId: actor.companyId },
-        _sum: { amount: true },
-        _count: true,
-      }),
-      this.prisma.vehicle.count({ where: { companyId: actor.companyId } }),
-      this.prisma.contract.count({ where: { companyId: actor.companyId, status: 'active' } }),
-    ]);
+    const [pendingCharges, paidCharges, expenses, chargesByType, fleetSize, activeContracts, recentCharges, recentExpenses] =
+      await Promise.all([
+        this.prisma.charge.aggregate({
+          where: { companyId: actor.companyId, status: 'pending' },
+          _sum: { amount: true },
+        }),
+        this.prisma.charge.aggregate({
+          where: { companyId: actor.companyId, status: 'paid' },
+          _sum: { amount: true },
+        }),
+        this.prisma.expense.aggregate({
+          where: { companyId: actor.companyId },
+          _sum: { amount: true },
+        }),
+        this.prisma.charge.groupBy({
+          by: ['type'],
+          where: { companyId: actor.companyId },
+          _sum: { amount: true },
+          _count: true,
+        }),
+        this.prisma.vehicle.count({ where: { companyId: actor.companyId } }),
+        this.prisma.contract.count({ where: { companyId: actor.companyId, status: 'active' } }),
+        this.prisma.charge.findMany({
+          where: { companyId: actor.companyId },
+          orderBy: { createdAt: 'desc' },
+          take: 8,
+          include: {
+            customer: { select: { name: true } },
+            contract: { select: { vehicle: { select: { plate: true } } } },
+          },
+        }),
+        this.prisma.expense.findMany({
+          where: { companyId: actor.companyId },
+          orderBy: { createdAt: 'desc' },
+          take: 8,
+          include: { vehicle: { select: { plate: true, brand: true, model: true } } },
+        }),
+      ]);
 
     const totalReceivable = Number(pendingCharges._sum.amount ?? 0);
     const totalReceived = Number(paidCharges._sum.amount ?? 0);
@@ -51,10 +69,47 @@ export class ReportsService {
       totalReceived: totalReceived.toFixed(2),
       totalExpenses: totalExpenses.toFixed(2),
       balance: (totalReceived - totalExpenses).toFixed(2),
-      chargesByType: chargesByType.map((c) => ({
+      chargesByType: chargesByType.map((c: { type: string; _count: number; _sum: { amount: unknown } }) => ({
         type: c.type,
         count: c._count,
         total: Number(c._sum.amount ?? 0).toFixed(2),
+      })),
+      recentCharges: recentCharges.map(
+        (c: {
+          id: string;
+          type: string;
+          description: string;
+          amount: { toString(): string };
+          status: string;
+          createdAt: Date;
+          customer: { name: string } | null;
+          contract: { vehicle: { plate: string } } | null;
+        }) => ({
+          id: c.id,
+          type: c.type,
+          description: c.description,
+          amount: c.amount.toString(),
+          status: c.status,
+          createdAt: c.createdAt,
+          customerName: c.customer?.name ?? null,
+          vehiclePlate: c.contract?.vehicle?.plate ?? null,
+        }),
+      ),
+      recentExpenses: recentExpenses.map(
+        (e: {
+          id: string;
+          category: string;
+          description: string;
+          amount: { toString(): string };
+          incurredAt: Date;
+          vehicle: { plate: string; brand: string; model: string } | null;
+        }) => ({
+          id: e.id,
+          category: e.category,
+          description: e.description,
+        amount: e.amount.toString(),
+        incurredAt: e.incurredAt,
+        vehicle: e.vehicle ? `${e.vehicle.plate} — ${e.vehicle.brand} ${e.vehicle.model}` : null,
       })),
       fleetSize,
       activeContracts,

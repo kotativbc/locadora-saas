@@ -32,8 +32,23 @@ function formatCurrency(value: string) {
   return Number(value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
+interface Customer {
+  id: string;
+  name: string;
+  document: string;
+}
+
+interface ContractOption {
+  id: string;
+  status: string;
+  customer: { name: string };
+  vehicle: { plate: string };
+}
+
 export function Finance() {
   const [charges, setCharges] = useState<Charge[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [contracts, setContracts] = useState<ContractOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -42,7 +57,14 @@ export function Finance() {
   async function load() {
     setLoading(true);
     try {
-      setCharges(await api.get<Charge[]>('/charges'));
+      const [ch, c, ct] = await Promise.all([
+        api.get<Charge[]>('/charges'),
+        api.get<Customer[]>('/customers'),
+        api.get<ContractOption[]>('/contracts'),
+      ]);
+      setCharges(ch);
+      setCustomers(c);
+      setContracts(ct);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Erro ao carregar lançamentos.');
     } finally {
@@ -126,18 +148,33 @@ export function Finance() {
         )}
       </div>
 
-      {formOpen && <NewChargeForm onCreated={() => { setFormOpen(false); load(); }} />}
+      {formOpen && (
+        <NewChargeForm customers={customers} contracts={contracts} onCreated={() => { setFormOpen(false); load(); }} />
+      )}
     </div>
   );
 }
 
-function NewChargeForm({ onCreated }: { onCreated: () => void }) {
+function NewChargeForm({
+  customers,
+  contracts,
+  onCreated,
+}: {
+  customers: Customer[];
+  contracts: ContractOption[];
+  onCreated: () => void;
+}) {
   const [type, setType] = useState<'rental' | 'damage' | 'fine' | 'other'>('other');
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
   const [dueDate, setDueDate] = useState('');
+  const [linkMode, setLinkMode] = useState<'none' | 'contract' | 'customer'>('none');
+  const [contractId, setContractId] = useState('');
+  const [customerId, setCustomerId] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const activeContracts = contracts.filter((c) => c.status === 'active');
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -146,6 +183,8 @@ function NewChargeForm({ onCreated }: { onCreated: () => void }) {
     try {
       await api.post('/charges', {
         type,
+        contractId: linkMode === 'contract' ? contractId || undefined : undefined,
+        customerId: linkMode === 'customer' ? customerId || undefined : undefined,
         description,
         amount,
         dueDate: dueDate ? new Date(dueDate).toISOString() : undefined,
@@ -183,6 +222,45 @@ function NewChargeForm({ onCreated }: { onCreated: () => void }) {
         <label>Vencimento (opcional)</label>
         <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
       </div>
+
+      <div className="field-group">
+        <div className="field-group__label">Vínculo (opcional)</div>
+        <div className="field" style={{ marginBottom: linkMode === 'none' ? 0 : undefined }}>
+          <label>Atrelar a</label>
+          <select value={linkMode} onChange={(e) => setLinkMode(e.target.value as typeof linkMode)}>
+            <option value="none">Nada</option>
+            <option value="contract">Um contrato vigente</option>
+            <option value="customer">Um cliente direto (sem contrato)</option>
+          </select>
+        </div>
+        {linkMode === 'contract' && (
+          <div className="field" style={{ marginBottom: 0 }}>
+            <label>Contrato</label>
+            <select value={contractId} onChange={(e) => setContractId(e.target.value)}>
+              <option value="">Selecione...</option>
+              {activeContracts.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.customer.name} — {c.vehicle.plate}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+        {linkMode === 'customer' && (
+          <div className="field" style={{ marginBottom: 0 }}>
+            <label>Cliente</label>
+            <select value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
+              <option value="">Selecione...</option>
+              {customers.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name} — {c.document}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
+
       <button className="btn" type="submit" disabled={submitting}>
         {submitting ? 'Salvando...' : 'Criar lançamento'}
       </button>
