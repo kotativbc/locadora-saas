@@ -22,7 +22,7 @@ export class SmtpEmailAdapter implements EmailAdapter {
     });
   }
 
-  async send(message: EmailMessage): Promise<void> {
+  async send(message: EmailMessage): Promise<{ sent: boolean }> {
     try {
       await this.transporter.sendMail({
         from: this.fromAddress,
@@ -30,11 +30,15 @@ export class SmtpEmailAdapter implements EmailAdapter {
         subject: message.subject,
         text: message.text,
         html: message.html,
+        attachments: message.attachments,
       });
+      return { sent: true };
     } catch (err) {
       // Nunca derruba o fluxo principal (ex: pedido de redefinição de senha)
-      // por falha de e-mail — só registra pra investigar depois.
+      // por falha de e-mail — só registra pra investigar depois. Quem chama
+      // e precisa saber se funcionou (ex: envio de fatura) confere o retorno.
       this.logger.error(`Falha ao enviar e-mail para ${message.to}: ${(err as Error).message}`);
+      return { sent: false };
     }
   }
 }

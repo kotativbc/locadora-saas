@@ -77,6 +77,8 @@ export function Contracts() {
   const [installmentsTarget, setInstallmentsTarget] = useState<Contract | null>(null);
   const [rentScheduleTarget, setRentScheduleTarget] = useState<Contract | null>(null);
   const [reportsTarget, setReportsTarget] = useState<Contract | null>(null);
+  const [sendingInvoiceId, setSendingInvoiceId] = useState<string | null>(null);
+  const [invoiceSentMessage, setInvoiceSentMessage] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
@@ -134,6 +136,30 @@ export function Contracts() {
     }
   }
 
+  async function handleViewInvoice(contractId: string) {
+    setError(null);
+    try {
+      const url = await fetchFileUrl(`/contracts/${contractId}/invoice-pdf`);
+      window.open(url, '_blank');
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erro ao abrir a fatura.');
+    }
+  }
+
+  async function handleSendInvoice(contractId: string) {
+    setError(null);
+    setSendingInvoiceId(contractId);
+    try {
+      const result = await api.post<{ sent: boolean; to: string }>(`/contracts/${contractId}/send-invoice`);
+      setInvoiceSentMessage(`Fatura enviada para ${result.to}.`);
+      setTimeout(() => setInvoiceSentMessage(null), 4000);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erro ao enviar a fatura por e-mail.');
+    } finally {
+      setSendingInvoiceId(null);
+    }
+  }
+
   return (
     <div>
       <div className="page-header">
@@ -142,6 +168,9 @@ export function Contracts() {
       </div>
 
       {error && <div className="error-banner">{error}</div>}
+      {invoiceSentMessage && (
+        <div style={{ fontSize: 13, color: 'var(--rtv-success)', marginBottom: 12 }}>{invoiceSentMessage}</div>
+      )}
 
       {linkInfo && (
         <div className="card" style={{ borderColor: 'var(--accent)' }}>
@@ -222,6 +251,21 @@ export function Contracts() {
                     <button className="logout-btn" style={{ color: 'var(--primary)', borderColor: 'var(--border)' }} onClick={() => handleViewPdf(c.id)}>
                       PDF
                     </button>
+                    {(c.status === 'active' || c.status === 'completed') && (
+                      <>
+                        <button className="logout-btn" style={{ color: 'var(--primary)', borderColor: 'var(--border)' }} onClick={() => handleViewInvoice(c.id)}>
+                          Fatura
+                        </button>
+                        <button
+                          className="logout-btn"
+                          style={{ color: 'var(--primary)', borderColor: 'var(--border)' }}
+                          disabled={sendingInvoiceId === c.id}
+                          onClick={() => handleSendInvoice(c.id)}
+                        >
+                          {sendingInvoiceId === c.id ? 'Enviando...' : 'Enviar fatura por e-mail'}
+                        </button>
+                      </>
+                    )}
                     {c.status === 'draft' && (
                       <button className="logout-btn" style={{ color: 'var(--primary)', borderColor: 'var(--border)' }} onClick={() => handleGenerateLink(c.id)}>
                         Gerar link

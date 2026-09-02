@@ -45,6 +45,19 @@ export class ContractsController {
     res.send(buffer);
   }
 
+  @Get(':id/invoice-pdf')
+  async getInvoicePdf(@Param('id') id: string, @CurrentUser() actor: RequestUser, @Res() res: Response) {
+    const buffer = await this.contractsService.buildInvoicePdf(id, actor);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="fatura-${id.slice(0, 8)}.pdf"`);
+    res.send(buffer);
+  }
+
+  @Post(':id/send-invoice')
+  sendInvoice(@Param('id') id: string, @CurrentUser() actor: RequestUser) {
+    return this.contractsService.sendInvoiceByEmail(id, actor);
+  }
+
   // ---------- Parcelas de caução ----------
 
   @Get(':id/caution-installments')

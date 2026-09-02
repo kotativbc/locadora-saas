@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -10,6 +11,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../common/audit-log.service';
 import { ContractPdfService } from './pdf/contract-pdf.service';
 import { ChargeGeneratorService } from '../finance/charge-generator.service';
+import { EMAIL_ADAPTER, EmailAdapter } from '../email/email-adapter.interface';
 import { CreateContractDto } from './dto/create-contract.dto';
 import { CreateCautionInstallmentDto } from './dto/create-caution-installment.dto';
 import { UpdateCautionInstallmentDto } from './dto/update-caution-installment.dto';
@@ -32,6 +34,7 @@ export class ContractsService {
     private readonly auditLog: AuditLogService,
     private readonly pdfService: ContractPdfService,
     private readonly chargeGenerator: ChargeGeneratorService,
+    @Inject(EMAIL_ADAPTER) private readonly emailAdapter: EmailAdapter,
   ) {}
 
   async create(dto: CreateContractDto, actor: RequestUser) {
@@ -185,6 +188,101 @@ export class ContractsService {
 
   async findOne(id: string, actor: RequestUser) {
     return this.findAndAssertSameCompany(id, actor);
+  }
+
+  /** Fatura/extrato em PDF — todos os lançamentos (Charge) deste contrato, formatado pra enviar ao cliente. */
+  async buildInvoicePdf(contractId: string, actor: RequestUser): Promise<Buffer> {
+    const contract = await this.prisma.contract.findUnique({
+      where: { id: contractId },
+      include: { company: true, customer: true, vehicle: true },
+    });
+    if (!contract || contract.companyId !== actor.companyId) {
+      throw new NotFoundException('Contrato não encontrado nesta empresa.');
+    }
+
+    const charges = await this.prisma.charge.findMany({
+      where: { contractId },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    return this.pdfService.renderInvoice({
+      contractId: contract.id,
+      invoiceNumber: contract.id.slice(0, 8).toUpperCase(),
+      issuedAt: new Date(),
+      company: {
+        name: contract.company.name,
+        tradeName: contract.company.tradeName,
+        cnpj: contract.company.cnpj,
+        addressCity: contract.company.addressCity,
+        addressState: contract.company.addressState,
+        contactEmail: contract.company.contactEmail,
+      },
+      customer: {
+        name: contract.customer.name,
+        document: contract.customer.document,
+        documentType: contract.customer.documentType,
+        email: contract.customer.email,
+        phone: contract.customer.phone,
+        address: contract.customer.address,
+      },
+      vehicle: {
+        plate: contract.vehicle.plate,
+        brand: contract.vehicle.brand,
+        model: contract.vehicle.model,
+      },
+      period: { startDate: contract.startDate, endDate: contract.endDate },
+      charges: charges.map(
+        (c: { createdAt: Date; description: string; type: string; status: string; amount: { toString(): string } }) => ({
+          createdAt: c.createdAt,
+          description: c.description,
+          type: c.type,
+          status: c.status,
+          amount: c.amount.toString(),
+        }),
+      ),
+    });
+  }
+
+  /** Gera a fatura e envia por e-mail ao cliente, se ele tiver e-mail cadastrado. */
+  async sendInvoiceByEmail(contractId: string, actor: RequestUser) {
+    const contract = await this.prisma.contract.findUnique({
+      where: { id: contractId },
+      include: { customer: true, company: true },
+    });
+    if (!contract || contract.companyId !== actor.companyId) {
+      throw new NotFoundException('Contrato não encontrado nesta empresa.');
+    }
+    if (!contract.customer.email) {
+      throw new BadRequestException('Este cliente não tem e-mail cadastrado — não há pra onde enviar.');
+    }
+
+    const pdfBuffer = await this.buildInvoicePdf(contractId, actor);
+    const companyLabel = contract.company.tradeName ?? contract.company.name;
+    const invoiceNumber = contract.id.slice(0, 8).toUpperCase();
+
+    const result = await this.emailAdapter.send({
+      to: contract.customer.email,
+      subject: `Fatura ${invoiceNumber} — ${companyLabel}`,
+      text: `Olá, ${contract.customer.name}. Segue em anexo a fatura referente ao seu contrato com ${companyLabel}.`,
+      html: `<p>Olá, ${contract.customer.name}.</p><p>Segue em anexo a fatura referente ao seu contrato com ${companyLabel}.</p>`,
+      attachments: [{ filename: `fatura-${invoiceNumber}.pdf`, content: pdfBuffer }],
+    });
+
+    if (!result.sent) {
+      throw new BadRequestException(
+        'Não foi possível enviar o e-mail — confira se o SMTP está configurado corretamente no servidor.',
+      );
+    }
+
+    await this.auditLog.record({
+      action: 'contract.invoice_emailed',
+      userId: actor.id,
+      companyId: actor.companyId,
+      entityType: 'Contract',
+      entityId: contractId,
+    });
+
+    return { sent: true, to: contract.customer.email };
   }
 
   // ---------- Parcelas de caução (Anexo II — cronograma manual) ----------
