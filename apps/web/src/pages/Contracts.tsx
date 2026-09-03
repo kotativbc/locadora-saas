@@ -386,7 +386,7 @@ function NewContractForm({
 }) {
   const [customerId, setCustomerId] = useState(customers[0]?.id ?? '');
   const [vehicleId, setVehicleId] = useState(vehicles[0]?.id ?? '');
-  const [templateType, setTemplateType] = useState<'standard' | 'monthly_app_driver' | 'protected'>('standard');
+  const [templateType, setTemplateType] = useState<'' | 'standard' | 'monthly_app_driver' | 'protected'>('');
   const monthlyPlans = ratePlans.filter((r) => r.monthlyRate);
   const protectedPlans = ratePlans.filter((r) => r.cautionAmount && r.kmAllowancePerMonth && r.extraKmRate);
   const [rateMode, setRateMode] = useState<'plan' | 'manual'>(ratePlans.length ? 'plan' : 'manual');
@@ -400,7 +400,7 @@ function NewContractForm({
   const selectedMonthlyPlan = monthlyPlans.find((r) => r.id === ratePlanId);
   const selectedProtectedPlan = protectedPlans.find((r) => r.id === ratePlanId);
 
-  function handleTemplateTypeChange(value: 'standard' | 'monthly_app_driver' | 'protected') {
+  function handleTemplateTypeChange(value: '' | 'standard' | 'monthly_app_driver' | 'protected') {
     setTemplateType(value);
     if (value === 'monthly_app_driver') {
       setRateMode('plan');
@@ -414,6 +414,10 @@ function NewContractForm({
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    if (!templateType) {
+      setError('Escolha o tipo de contrato antes de continuar — esse campo não tem valor padrão de propósito.');
+      return;
+    }
     setSubmitting(true);
     try {
       await api.post('/contracts', {
@@ -451,12 +455,23 @@ function NewContractForm({
       <div className="field-group">
         <div className="field-group__label">Tipo de contrato</div>
         <div className="field" style={{ marginBottom: 0 }}>
-          <select value={templateType} onChange={(e) => handleTemplateTypeChange(e.target.value as typeof templateType)}>
+          <select
+            required
+            value={templateType}
+            onChange={(e) => handleTemplateTypeChange(e.target.value as typeof templateType)}
+            style={!templateType ? { borderColor: 'var(--rtv-danger)' } : undefined}
+          >
+            <option value="" disabled>— Escolha o tipo, não tem valor pré-selecionado —</option>
             <option value="standard">Padrão (diária/semanal/mensal)</option>
             <option value="protected">Padrão com Proteção Total (caução, KM controlado, telemetria)</option>
             <option value="monthly_app_driver">Motorista de aplicativo (mensal, com caução e KM controlado)</option>
           </select>
         </div>
+        {templateType && (
+          <p style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--rtv-teal-600)', marginTop: 8, marginBottom: 0 }}>
+            ✓ Tipo selecionado: {templateType === 'standard' ? 'Padrão' : templateType === 'protected' ? 'Padrão com Proteção Total' : 'Motorista de aplicativo'}
+          </p>
+        )}
       </div>
 
       <div className="field-group">
@@ -588,7 +603,7 @@ function NewContractForm({
       <button
         className="btn"
         type="submit"
-        disabled={submitting || (templateType === 'monthly_app_driver' && monthlyPlans.length === 0)}
+        disabled={submitting || !templateType || (templateType === 'monthly_app_driver' && monthlyPlans.length === 0)}
         style={{ marginTop: 4 }}
       >
         {submitting ? 'Criando...' : 'Criar contrato (rascunho)'}
