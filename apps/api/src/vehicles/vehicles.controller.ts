@@ -37,6 +37,11 @@ export class VehiclesController {
     return this.vehiclesService.update(id, dto, actor);
   }
 
+  @Get(':id/financial-summary')
+  getFinancialSummary(@Param('id') id: string, @CurrentUser() actor: RequestUser) {
+    return this.vehiclesService.getFinancialSummary(id, actor);
+  }
+
   @Get(':id/documents')
   listDocuments(@Param('id') id: string, @CurrentUser() actor: RequestUser) {
     return this.documentsService.listFor('VEHICLE', id, actor);

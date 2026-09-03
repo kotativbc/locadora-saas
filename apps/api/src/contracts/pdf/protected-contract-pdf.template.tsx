@@ -38,7 +38,14 @@ export interface ProtectedContractPdfData {
     documentType: string;
     identityNumber: string | null;
     driverLicenseNumber: string | null;
-    address: string | null;
+    address: string | null; // legado — só usado se os campos estruturados abaixo estiverem vazios
+    addressStreet: string | null;
+    addressNumber: string | null;
+    addressComplement: string | null;
+    addressNeighborhood: string | null;
+    addressCity: string | null;
+    addressState: string | null;
+    addressZipCode: string | null;
   };
   vehicle: {
     plate: string;
@@ -77,6 +84,19 @@ function formatDate(d: Date) {
 function formatCurrency(v: string | null) {
   if (!v) return 'a combinar';
   return Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+/** Monta o endereço a partir dos campos estruturados; cai pro texto livre legado se não tiver nenhum estruturado. */
+function formatCustomerAddress(c: ProtectedContractPdfData['customer']): string | null {
+  if (c.addressStreet && c.addressCity) {
+    const parts = [`${c.addressStreet}${c.addressNumber ? `, ${c.addressNumber}` : ''}`];
+    if (c.addressComplement) parts.push(c.addressComplement);
+    if (c.addressNeighborhood) parts.push(c.addressNeighborhood);
+    parts.push(`${c.addressCity}${c.addressState ? `/${c.addressState}` : ''}`);
+    if (c.addressZipCode) parts.push(`CEP ${c.addressZipCode}`);
+    return parts.join(', ');
+  }
+  return c.address; // legado
 }
 
 const FUEL_CHECK_ORDER: { key: string; label: string }[] = [
@@ -137,7 +157,7 @@ export function ProtectedContractPdfDocument({
           {customer.name} {customer.documentType} {customer.document}
           {customer.identityNumber ? `, IDENTIDADE: ${customer.identityNumber}` : ''}
           {customer.driverLicenseNumber ? ` HABILITAÇÃO ${customer.driverLicenseNumber}` : ''}
-          {customer.address ? `, ENDEREÇO ${customer.address}` : ''}
+          {formatCustomerAddress(customer) ? `, ENDEREÇO ${formatCustomerAddress(customer)}` : ''}
         </Text>
         <Text style={styles.clause}>
           <Text style={{ fontFamily: 'Helvetica-Bold' }}>VEÍCULO LOCADO: </Text>
@@ -443,7 +463,7 @@ export function ProtectedContractPdfDocument({
           Pelo presente instrumento, eu, {customer.name} {customer.documentType} {customer.document}
           {customer.identityNumber ? `, IDENTIDADE: ${customer.identityNumber}` : ''}
           {customer.driverLicenseNumber ? ` HABILITAÇÃO ${customer.driverLicenseNumber}` : ''}
-          {customer.address ? `, ENDEREÇO ${customer.address}` : ''}, qualificado no Contrato Principal, na
+          {formatCustomerAddress(customer) ? `, ENDEREÇO ${formatCustomerAddress(customer)}` : ''}, qualificado no Contrato Principal, na
           condição de possuidor direto do veículo placa {vehicle.plate} no período de{' '}
           {formatDate(contract.startDate)} até a sua efetiva devolução, assumo integral e exclusiva
           responsabilidade por toda e qualquer infração de trânsito (esfera municipal, estadual ou federal)

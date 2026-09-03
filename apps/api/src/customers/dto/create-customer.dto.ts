@@ -29,9 +29,40 @@ export class CreateCustomerDto {
   @IsDateString()
   birthDate?: string;
 
+  // Endereço estruturado — obrigatório em cadastro novo. O campo `address`
+  // (texto livre) fica só como legado, pra clientes cadastrados antes desta
+  // mudança; não é mais preenchido por formulário novo.
   @IsOptional()
   @IsString()
   address?: string;
+
+  @IsString()
+  @MinLength(2)
+  addressStreet!: string;
+
+  @IsString()
+  @MinLength(1)
+  addressNumber!: string;
+
+  @IsOptional()
+  @IsString()
+  addressComplement?: string;
+
+  @IsOptional()
+  @IsString()
+  addressNeighborhood?: string;
+
+  @IsString()
+  @MinLength(2)
+  addressCity!: string;
+
+  @IsString()
+  @MinLength(2)
+  addressState!: string;
+
+  @IsOptional()
+  @IsString()
+  addressZipCode?: string;
 
   @IsOptional()
   @IsString()

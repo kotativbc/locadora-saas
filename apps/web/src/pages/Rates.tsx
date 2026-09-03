@@ -192,15 +192,15 @@ function NewRatePlanForm({ vehicles, onCreated }: { vehicles: Vehicle[]; onCreat
       )}
       <div className="field">
         <label>Diária (R$)</label>
-        <input required type="number" step="0.01" min="0" value={dailyRate} onChange={(e) => setDailyRate(e.target.value)} />
+        <input required type="number" step="0.01" inputMode="decimal" min="0" value={dailyRate} onChange={(e) => setDailyRate(e.target.value)} />
       </div>
       <div className="field">
         <label>Semanal (R$, opcional)</label>
-        <input type="number" step="0.01" min="0" value={weeklyRate} onChange={(e) => setWeeklyRate(e.target.value)} />
+        <input type="number" step="0.01" inputMode="decimal" min="0" value={weeklyRate} onChange={(e) => setWeeklyRate(e.target.value)} />
       </div>
       <div className="field">
         <label>Mensal (R$, opcional)</label>
-        <input type="number" step="0.01" min="0" value={monthlyRate} onChange={(e) => setMonthlyRate(e.target.value)} />
+        <input type="number" step="0.01" inputMode="decimal" min="0" value={monthlyRate} onChange={(e) => setMonthlyRate(e.target.value)} />
       </div>
       <div className="field-group">
         <div className="field-group__label">Motorista de aplicativo (opcional — só preencha se for usar esse tipo de contrato)</div>
@@ -210,11 +210,11 @@ function NewRatePlanForm({ vehicles, onCreated }: { vehicles: Vehicle[]; onCreat
         </div>
         <div className="field">
           <label>Valor do KM excedente (R$)</label>
-          <input type="number" step="0.01" min="0" value={extraKmRate} onChange={(e) => setExtraKmRate(e.target.value)} />
+          <input type="number" step="0.01" inputMode="decimal" min="0" value={extraKmRate} onChange={(e) => setExtraKmRate(e.target.value)} />
         </div>
         <div className="field" style={{ marginBottom: 0 }}>
           <label>Valor da caução (R$)</label>
-          <input type="number" step="0.01" min="0" value={cautionAmount} onChange={(e) => setCautionAmount(e.target.value)} />
+          <input type="number" step="0.01" inputMode="decimal" min="0" value={cautionAmount} onChange={(e) => setCautionAmount(e.target.value)} />
         </div>
       </div>
       <button className="btn" type="submit" disabled={submitting}>

@@ -99,7 +99,14 @@ export interface InvoicePdfData {
     documentType: string;
     email: string | null;
     phone: string | null;
-    address: string | null;
+    address: string | null; // legado — só usado se os campos estruturados abaixo estiverem vazios
+    addressStreet: string | null;
+    addressNumber: string | null;
+    addressComplement: string | null;
+    addressNeighborhood: string | null;
+    addressCity: string | null;
+    addressState: string | null;
+    addressZipCode: string | null;
   };
   vehicle: {
     plate: string;
@@ -122,6 +129,19 @@ function formatDate(d: Date) {
 
 function formatCurrency(v: string | number) {
   return Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+/** Monta o endereço a partir dos campos estruturados; cai pro texto livre legado se não tiver nenhum estruturado. */
+function formatCustomerAddress(c: InvoicePdfData['customer']): string | null {
+  if (c.addressStreet && c.addressCity) {
+    const parts = [`${c.addressStreet}${c.addressNumber ? `, ${c.addressNumber}` : ''}`];
+    if (c.addressComplement) parts.push(c.addressComplement);
+    if (c.addressNeighborhood) parts.push(c.addressNeighborhood);
+    parts.push(`${c.addressCity}${c.addressState ? `/${c.addressState}` : ''}`);
+    if (c.addressZipCode) parts.push(`CEP ${c.addressZipCode}`);
+    return parts.join(', ');
+  }
+  return c.address; // legado
 }
 
 const TYPE_LABELS: Record<string, string> = {
@@ -185,7 +205,7 @@ export function InvoicePdfDocument({
               <Text style={styles.partyLine}>
                 {customer.documentType} {customer.document}
               </Text>
-              {customer.address && <Text style={styles.partyLine}>{customer.address}</Text>}
+              {formatCustomerAddress(customer) && <Text style={styles.partyLine}>{formatCustomerAddress(customer)}</Text>}
               {customer.email && <Text style={styles.partyLine}>{customer.email}</Text>}
               {customer.phone && <Text style={styles.partyLine}>{customer.phone}</Text>}
             </View>

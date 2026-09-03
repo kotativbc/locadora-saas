@@ -47,7 +47,14 @@ export interface MonthlyDriverContractPdfData {
     documentType: string;
     driverLicenseNumber: string | null;
     driverLicenseCategory: string | null;
-    address: string | null;
+    address: string | null; // legado — só usado se os campos estruturados abaixo estiverem vazios
+    addressStreet: string | null;
+    addressNumber: string | null;
+    addressComplement: string | null;
+    addressNeighborhood: string | null;
+    addressCity: string | null;
+    addressState: string | null;
+    addressZipCode: string | null;
     email: string | null;
     phone: string | null;
     bankName: string | null;
@@ -87,6 +94,19 @@ function formatDate(d: Date) {
 function formatCurrency(v: string | null) {
   if (!v) return 'a combinar';
   return Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+/** Monta o endereço do cliente a partir dos campos estruturados; cai pro texto livre legado se não tiver nenhum estruturado. */
+function formatCustomerAddress(c: MonthlyDriverContractPdfData['customer']): string | null {
+  if (c.addressStreet && c.addressCity) {
+    const parts = [`${c.addressStreet}${c.addressNumber ? `, ${c.addressNumber}` : ''}`];
+    if (c.addressComplement) parts.push(c.addressComplement);
+    if (c.addressNeighborhood) parts.push(c.addressNeighborhood);
+    parts.push(`${c.addressCity}${c.addressState ? `/${c.addressState}` : ''}`);
+    if (c.addressZipCode) parts.push(`CEP ${c.addressZipCode}`);
+    return parts.join(', ');
+  }
+  return c.address; // legado
 }
 
 function formatAddress(c: MonthlyDriverContractPdfData['company']) {
@@ -140,7 +160,7 @@ export function MonthlyDriverContractPdfDocument({
           <Text style={{ fontFamily: 'Helvetica-Bold' }}>LOCATÁRIO (MOTORISTA): </Text>
           {customer.name}, {customer.documentType} nº {customer.document}
           {cnhLabel ? `, CNH nº ${cnhLabel}` : ''}
-          {customer.address ? `, residente em ${customer.address}` : ''}
+          {formatCustomerAddress(customer) ? `, residente em ${formatCustomerAddress(customer)}` : ''}
           {customer.email ? `, e-mail ${customer.email}` : ''}
           {customer.phone ? `, telefone ${customer.phone}` : ''}.
         </Text>

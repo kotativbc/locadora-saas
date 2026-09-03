@@ -216,7 +216,7 @@ function NewChargeForm({
       </div>
       <div className="field">
         <label>Valor (R$)</label>
-        <input required type="number" step="0.01" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} />
+        <input required type="number" step="0.01" inputMode="decimal" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} />
       </div>
       <div className="field">
         <label>Vencimento (opcional)</label>

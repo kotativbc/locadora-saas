@@ -1,4 +1,4 @@
-import { IsIn, IsInt, IsNumberString, IsOptional, IsString, Min, MinLength } from 'class-validator';
+import { IsIn, IsInt, IsNumberString, IsOptional, IsString, Max, Min, MinLength } from 'class-validator';
 
 const STATUSES = ['available', 'rented', 'maintenance', 'inactive'] as const;
 
@@ -12,6 +12,18 @@ export class UpdateVehicleDto {
   @IsString()
   @MinLength(1)
   model?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1950)
+  @Max(2100)
+  modelYear?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1950)
+  @Max(2100)
+  manufactureYear?: number;
 
   @IsOptional()
   @IsString()
@@ -41,6 +53,10 @@ export class UpdateVehicleDto {
   @IsOptional()
   @IsNumberString()
   fipeValue?: string;
+
+  @IsOptional()
+  @IsNumberString()
+  acquisitionCost?: string;
 
   @IsOptional()
   @IsInt()

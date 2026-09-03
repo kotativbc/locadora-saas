@@ -260,6 +260,7 @@ model Vehicle {
   odometerKm      Int      @default(0)
   fuelType        String? // flex, gasolina, diesel, eletrico, hibrido
   fipeValue       Decimal? @db.Decimal(10, 2) // base pra multas indenizatórias calculadas em % da FIPE
+  acquisitionCost Decimal? @db.Decimal(10, 2) // quanto o veículo custou pra empresa — diferente da FIPE (valor de mercado), usado pra ver retorno real
   maintenanceIntervalKm Int? // a cada quantos km pede revisão preventiva (padrão sugerido: 10000)
   notes           String?
   createdAt       DateTime @default(now())
@@ -293,7 +294,14 @@ model Customer {
   email                  String?
   phone                  String?
   birthDate              DateTime?
-  address                String?
+  address                String? // legado — texto livre, mantido pra não perder dado de clientes já cadastrados; formulário novo usa os campos estruturados abaixo
+  addressStreet          String?
+  addressNumber          String?
+  addressComplement      String?
+  addressNeighborhood    String?
+  addressCity            String?
+  addressState           String?
+  addressZipCode         String?
   driverLicenseNumber    String?
   driverLicenseCategory  String?
   driverLicenseExpiry    DateTime?

@@ -582,7 +582,7 @@ function NewContractForm({
           ) : (
             <div className="field" style={{ marginBottom: 0 }}>
               <label>Diária (R$)</label>
-              <input required type="number" step="0.01" min="0" value={dailyRate} onChange={(e) => setDailyRate(e.target.value)} />
+              <input required type="number" step="0.01" inputMode="decimal" min="0" value={dailyRate} onChange={(e) => setDailyRate(e.target.value)} />
             </div>
           )}
         </div>
@@ -880,7 +880,7 @@ function RentInstallmentsPanel({ contract, onClose }: { contract: Contract; onCl
             </div>
             <div className="field" style={{ marginBottom: 0 }}>
               <label>Valor (R$)</label>
-              <input required type="number" step="0.01" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} />
+              <input required type="number" step="0.01" inputMode="decimal" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} />
             </div>
             <button className="btn" type="submit" disabled={submitting}>
               {submitting ? 'Adicionando...' : '+ Adicionar parcela'}
@@ -1032,7 +1032,7 @@ function CautionInstallmentsPanel({ contract, onClose }: { contract: Contract; o
             </div>
             <div className="field" style={{ marginBottom: 0 }}>
               <label>Valor (R$)</label>
-              <input required type="number" step="0.01" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} />
+              <input required type="number" step="0.01" inputMode="decimal" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} />
             </div>
             <button className="btn" type="submit" disabled={submitting}>
               {submitting ? 'Adicionando...' : '+ Adicionar parcela'}

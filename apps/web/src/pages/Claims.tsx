@@ -227,7 +227,7 @@ function NewClaimForm({ vehicles, onCreated }: { vehicles: Vehicle[]; onCreated:
       </label>
       <div className="field">
         <label>Custo estimado (R$, opcional)</label>
-        <input type="number" step="0.01" min="0" value={estimatedCost} onChange={(e) => setEstimatedCost(e.target.value)} />
+        <input type="number" step="0.01" inputMode="decimal" min="0" value={estimatedCost} onChange={(e) => setEstimatedCost(e.target.value)} />
       </div>
       <button className="btn" type="submit" disabled={submitting}>
         {submitting ? 'Salvando...' : 'Registrar sinistro'}

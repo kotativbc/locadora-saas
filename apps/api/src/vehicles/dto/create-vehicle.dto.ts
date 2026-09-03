@@ -57,6 +57,10 @@ export class CreateVehicleDto {
   fipeValue?: string;
 
   @IsOptional()
+  @IsNumberString()
+  acquisitionCost?: string;
+
+  @IsOptional()
   @IsInt()
   @Min(1000)
   maintenanceIntervalKm?: number;

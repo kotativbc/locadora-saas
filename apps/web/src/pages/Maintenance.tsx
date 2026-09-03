@@ -184,7 +184,7 @@ function NewMaintenanceForm({ vehicles, onCreated }: { vehicles: Vehicle[]; onCr
       </div>
       <div className="field">
         <label>Custo (R$, opcional)</label>
-        <input type="number" step="0.01" min="0" value={cost} onChange={(e) => setCost(e.target.value)} />
+        <input type="number" step="0.01" inputMode="decimal" min="0" value={cost} onChange={(e) => setCost(e.target.value)} />
       </div>
       <div className="field">
         <label>Oficina/fornecedor (opcional)</label>

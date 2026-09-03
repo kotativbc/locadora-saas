@@ -93,7 +93,13 @@ function NewCustomerForm({ onCreated }: { onCreated: () => void }) {
   const [documentType, setDocumentType] = useState<'CPF' | 'CNPJ'>('CPF');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [address, setAddress] = useState('');
+  const [addressStreet, setAddressStreet] = useState('');
+  const [addressNumber, setAddressNumber] = useState('');
+  const [addressComplement, setAddressComplement] = useState('');
+  const [addressNeighborhood, setAddressNeighborhood] = useState('');
+  const [addressCity, setAddressCity] = useState('');
+  const [addressState, setAddressState] = useState('');
+  const [addressZipCode, setAddressZipCode] = useState('');
   const [driverLicenseNumber, setDriverLicenseNumber] = useState('');
   const [driverLicenseCategory, setDriverLicenseCategory] = useState('');
   const [bankName, setBankName] = useState('');
@@ -115,7 +121,13 @@ function NewCustomerForm({ onCreated }: { onCreated: () => void }) {
         identityNumber: identityNumber || undefined,
         email: email || undefined,
         phone: phone || undefined,
-        address: address || undefined,
+        addressStreet,
+        addressNumber,
+        addressComplement: addressComplement || undefined,
+        addressNeighborhood: addressNeighborhood || undefined,
+        addressCity,
+        addressState,
+        addressZipCode: addressZipCode || undefined,
         driverLicenseNumber: driverLicenseNumber || undefined,
         driverLicenseCategory: driverLicenseCategory || undefined,
         bankName: bankName || undefined,
@@ -157,17 +169,49 @@ function NewCustomerForm({ onCreated }: { onCreated: () => void }) {
           <label>RG/Identidade (opcional)</label>
           <input value={identityNumber} onChange={(e) => setIdentityNumber(e.target.value)} />
         </div>
-        <div className="field">
+        <div className="field" style={{ marginBottom: 0 }}>
           <label>E-mail (opcional)</label>
           <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
         </div>
-        <div className="field">
+        <div className="field" style={{ marginBottom: 0 }}>
           <label>Telefone (opcional)</label>
           <input value={phone} onChange={(e) => setPhone(e.target.value)} />
         </div>
-        <div className="field" style={{ marginBottom: 0 }}>
-          <label>Endereço completo (opcional)</label>
-          <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Rua, número, bairro, cidade/UF" />
+      </div>
+
+      <div className="field-group">
+        <div className="field-group__label">Endereço</div>
+        <div style={{ display: 'flex', gap: 14 }}>
+          <div className="field" style={{ flex: 3 }}>
+            <label>Rua/Avenida</label>
+            <input required value={addressStreet} onChange={(e) => setAddressStreet(e.target.value)} />
+          </div>
+          <div className="field" style={{ flex: 1 }}>
+            <label>Número</label>
+            <input required value={addressNumber} onChange={(e) => setAddressNumber(e.target.value)} />
+          </div>
+        </div>
+        <div className="field">
+          <label>Complemento (opcional)</label>
+          <input value={addressComplement} onChange={(e) => setAddressComplement(e.target.value)} />
+        </div>
+        <div style={{ display: 'flex', gap: 14 }}>
+          <div className="field" style={{ flex: 1 }}>
+            <label>Bairro (opcional)</label>
+            <input value={addressNeighborhood} onChange={(e) => setAddressNeighborhood(e.target.value)} />
+          </div>
+          <div className="field" style={{ flex: 2 }}>
+            <label>Cidade</label>
+            <input required value={addressCity} onChange={(e) => setAddressCity(e.target.value)} />
+          </div>
+          <div className="field" style={{ flex: 0.6 }}>
+            <label>Estado</label>
+            <input required maxLength={2} value={addressState} onChange={(e) => setAddressState(e.target.value.toUpperCase())} />
+          </div>
+        </div>
+        <div className="field" style={{ marginBottom: 0, maxWidth: 200 }}>
+          <label>CEP (opcional)</label>
+          <input value={addressZipCode} onChange={(e) => setAddressZipCode(e.target.value)} />
         </div>
       </div>
 
