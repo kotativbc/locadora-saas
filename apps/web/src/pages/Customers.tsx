@@ -34,6 +34,19 @@ export function Customers() {
     load();
   }, []);
 
+  async function handleDelete(customer: Customer) {
+    if (!window.confirm(`Excluir o cliente "${customer.name}"? Só é possível se ele não tiver nenhum contrato (nem rascunho). Documentos anexados dele também são apagados.`)) {
+      return;
+    }
+    setError(null);
+    try {
+      await api.delete(`/customers/${customer.id}`);
+      load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erro ao excluir o cliente.');
+    }
+  }
+
   return (
     <div>
       <div className="page-header">
@@ -63,6 +76,7 @@ export function Customers() {
                 <th>Documento</th>
                 <th>Contato</th>
                 <th>Status</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -74,6 +88,15 @@ export function Customers() {
                   </td>
                   <td>{c.email || c.phone || '—'}</td>
                   <td>{c.active ? 'Ativo' : 'Inativo'}</td>
+                  <td>
+                    <button
+                      className="logout-btn"
+                      style={{ color: 'var(--rtv-danger)', borderColor: 'var(--border)' }}
+                      onClick={() => handleDelete(c)}
+                    >
+                      Excluir
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>

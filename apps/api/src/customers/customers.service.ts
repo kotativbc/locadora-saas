@@ -1,6 +1,8 @@
-import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import * as fs from 'fs/promises';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../common/audit-log.service';
+import { ownerDocumentsDir } from '../common/storage';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { RequestUser } from '../auth/types';
@@ -77,6 +79,43 @@ export class CustomersService {
     });
 
     return customer;
+  }
+
+  /**
+   * Exclusão definitiva. Bloqueada se o cliente tiver qualquer contrato (o banco
+   * já recusaria de qualquer jeito — Contract.customerId é obrigatório e sem
+   * cascata — mas aqui a gente confere antes e dá uma mensagem clara em vez de
+   * deixar vazar um erro cru de constraint). Documentos anexados (CNH, etc.) são
+   * apagados junto, banco e disco.
+   */
+  async remove(id: string, actor: RequestUser) {
+    const customer = await this.findAndAssertSameCompany(id, actor);
+
+    const contractCount = await this.prisma.contract.count({ where: { customerId: id } });
+    if (contractCount > 0) {
+      throw new BadRequestException(
+        `Este cliente tem ${contractCount} contrato(s) vinculado(s) e não pode ser excluído — isso vale mesmo pra contratos em rascunho. Se for um cadastro de teste, exclua os contratos primeiro (só é possível excluir contrato que nunca foi assinado).`,
+      );
+    }
+
+    await this.auditLog.record({
+      action: 'customer.delete',
+      userId: actor.id,
+      companyId: actor.companyId,
+      entityType: 'Customer',
+      entityId: id,
+      metadata: { name: customer.name, document: customer.document },
+    });
+
+    await this.prisma.customer.delete({ where: { id } });
+
+    // Limpeza de arquivo é melhor-esforço — o dado já foi apagado do banco
+    // (isso é o que importa de verdade); se sobrar lixo em disco, não trava a operação.
+    if (actor.companyId) {
+      await fs.rm(ownerDocumentsDir(actor.companyId, 'customers', id), { recursive: true, force: true }).catch(() => undefined);
+    }
+
+    return { deleted: true };
   }
 
   private async findAndAssertSameCompany(id: string, actor: RequestUser) {
