@@ -1,6 +1,7 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
 import { MaintenanceService } from './maintenance.service';
 import { CreateMaintenanceDto } from './dto/create-maintenance.dto';
+import { UpdateMaintenanceDto } from './dto/update-maintenance.dto';
 import { RequirePermissions } from '../rbac/permissions.decorator';
 import { PermissionCode } from '../rbac/rbac.constants';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -19,5 +20,10 @@ export class MaintenanceController {
   @Get()
   findAll(@CurrentUser() actor: RequestUser) {
     return this.maintenanceService.findAll(actor);
+  }
+
+  @Patch(':id')
+  update(@Param('id') id: string, @Body() dto: UpdateMaintenanceDto, @CurrentUser() actor: RequestUser) {
+    return this.maintenanceService.update(id, dto, actor);
   }
 }

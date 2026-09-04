@@ -69,7 +69,21 @@ export class ClaimsService {
       throw new ForbiddenException('Você não tem acesso a este sinistro.');
     }
 
-    const updated = await this.prisma.claim.update({ where: { id }, data: dto });
+    const updated = await this.prisma.claim.update({
+      where: { id },
+      data: {
+        type: dto.type,
+        occurredAt: dto.occurredAt ? new Date(dto.occurredAt) : undefined,
+        location: dto.location,
+        description: dto.description,
+        policeReportNumber: dto.policeReportNumber,
+        thirdPartyInvolved: dto.thirdPartyInvolved,
+        thirdPartyDescription: dto.thirdPartyDescription,
+        insuranceClaimNumber: dto.insuranceClaimNumber,
+        estimatedCost: dto.estimatedCost,
+        status: dto.status,
+      },
+    });
 
     await this.auditLog.record({
       action: 'claim.update',

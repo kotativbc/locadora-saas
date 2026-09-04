@@ -18,6 +18,7 @@ export function Customers() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<Customer | null>(null);
 
   async function load() {
     setLoading(true);
@@ -91,6 +92,13 @@ export function Customers() {
                   <td>
                     <button
                       className="logout-btn"
+                      style={{ color: 'var(--primary)', borderColor: 'var(--border)', marginRight: 6 }}
+                      onClick={() => setEditTarget(c)}
+                    >
+                      Editar
+                    </button>
+                    <button
+                      className="logout-btn"
                       style={{ color: 'var(--rtv-danger)', borderColor: 'var(--border)' }}
                       onClick={() => handleDelete(c)}
                     >
@@ -105,6 +113,14 @@ export function Customers() {
       </div>
 
       {formOpen && <NewCustomerForm onCreated={() => { setFormOpen(false); load(); }} />}
+
+      {editTarget && (
+        <EditCustomerForm
+          customer={editTarget}
+          onSaved={() => { setEditTarget(null); load(); }}
+          onCancel={() => setEditTarget(null)}
+        />
+      )}
     </div>
   );
 }
@@ -273,6 +289,247 @@ function NewCustomerForm({ onCreated }: { onCreated: () => void }) {
       <button className="btn" type="submit" disabled={submitting}>
         {submitting ? 'Cadastrando...' : 'Cadastrar cliente'}
       </button>
+    </form>
+  );
+}
+
+interface FullCustomer {
+  id: string;
+  name: string;
+  document: string;
+  documentType: 'CPF' | 'CNPJ';
+  identityNumber: string | null;
+  email: string | null;
+  phone: string | null;
+  addressStreet: string | null;
+  addressNumber: string | null;
+  addressComplement: string | null;
+  addressNeighborhood: string | null;
+  addressCity: string | null;
+  addressState: string | null;
+  addressZipCode: string | null;
+  driverLicenseNumber: string | null;
+  driverLicenseCategory: string | null;
+  bankName: string | null;
+  bankAgency: string | null;
+  bankAccount: string | null;
+  pixKey: string | null;
+  active: boolean;
+}
+
+function EditCustomerForm({
+  customer,
+  onSaved,
+  onCancel,
+}: {
+  customer: Customer;
+  onSaved: () => void;
+  onCancel: () => void;
+}) {
+  const [full, setFull] = useState<FullCustomer | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [name, setName] = useState('');
+  const [identityNumber, setIdentityNumber] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [addressStreet, setAddressStreet] = useState('');
+  const [addressNumber, setAddressNumber] = useState('');
+  const [addressComplement, setAddressComplement] = useState('');
+  const [addressNeighborhood, setAddressNeighborhood] = useState('');
+  const [addressCity, setAddressCity] = useState('');
+  const [addressState, setAddressState] = useState('');
+  const [addressZipCode, setAddressZipCode] = useState('');
+  const [driverLicenseNumber, setDriverLicenseNumber] = useState('');
+  const [driverLicenseCategory, setDriverLicenseCategory] = useState('');
+  const [bankName, setBankName] = useState('');
+  const [bankAgency, setBankAgency] = useState('');
+  const [bankAccount, setBankAccount] = useState('');
+  const [pixKey, setPixKey] = useState('');
+  const [active, setActive] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    api
+      .get<FullCustomer>(`/customers/${customer.id}`)
+      .then((c) => {
+        setFull(c);
+        setName(c.name);
+        setIdentityNumber(c.identityNumber ?? '');
+        setEmail(c.email ?? '');
+        setPhone(c.phone ?? '');
+        setAddressStreet(c.addressStreet ?? '');
+        setAddressNumber(c.addressNumber ?? '');
+        setAddressComplement(c.addressComplement ?? '');
+        setAddressNeighborhood(c.addressNeighborhood ?? '');
+        setAddressCity(c.addressCity ?? '');
+        setAddressState(c.addressState ?? '');
+        setAddressZipCode(c.addressZipCode ?? '');
+        setDriverLicenseNumber(c.driverLicenseNumber ?? '');
+        setDriverLicenseCategory(c.driverLicenseCategory ?? '');
+        setBankName(c.bankName ?? '');
+        setBankAgency(c.bankAgency ?? '');
+        setBankAccount(c.bankAccount ?? '');
+        setPixKey(c.pixKey ?? '');
+        setActive(c.active);
+      })
+      .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Erro ao carregar cliente.'));
+  }, [customer.id]);
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    try {
+      await api.patch(`/customers/${customer.id}`, {
+        name,
+        identityNumber: identityNumber || undefined,
+        email: email || undefined,
+        phone: phone || undefined,
+        addressStreet: addressStreet || undefined,
+        addressNumber: addressNumber || undefined,
+        addressComplement: addressComplement || undefined,
+        addressNeighborhood: addressNeighborhood || undefined,
+        addressCity: addressCity || undefined,
+        addressState: addressState || undefined,
+        addressZipCode: addressZipCode || undefined,
+        driverLicenseNumber: driverLicenseNumber || undefined,
+        driverLicenseCategory: driverLicenseCategory || undefined,
+        bankName: bankName || undefined,
+        bankAgency: bankAgency || undefined,
+        bankAccount: bankAccount || undefined,
+        pixKey: pixKey || undefined,
+        active,
+      });
+      onSaved();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erro ao salvar o cliente.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (loadError) {
+    return (
+      <div className="card">
+        <div className="error-banner">{loadError}</div>
+      </div>
+    );
+  }
+  if (!full) {
+    return (
+      <div className="card">
+        <p style={{ margin: 0 }}>Carregando...</p>
+      </div>
+    );
+  }
+
+  return (
+    <form className="card" onSubmit={handleSubmit}>
+      <h3 style={{ marginTop: 0 }}>Editar cliente — {customer.document}</h3>
+      {error && <div className="error-banner">{error}</div>}
+
+      <div className="field-group">
+        <div className="field-group__label">Dados pessoais</div>
+        <div className="field">
+          <label>Nome completo</label>
+          <input required value={name} onChange={(e) => setName(e.target.value)} />
+        </div>
+        <div className="field">
+          <label>RG/Identidade (opcional)</label>
+          <input value={identityNumber} onChange={(e) => setIdentityNumber(e.target.value)} />
+        </div>
+        <div className="field">
+          <label>E-mail (opcional)</label>
+          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+        </div>
+        <div className="field" style={{ marginBottom: 0 }}>
+          <label>Telefone (opcional)</label>
+          <input value={phone} onChange={(e) => setPhone(e.target.value)} />
+        </div>
+      </div>
+
+      <div className="field-group">
+        <div className="field-group__label">Endereço</div>
+        <div style={{ display: 'flex', gap: 14 }}>
+          <div className="field" style={{ flex: 3 }}>
+            <label>Rua/Avenida</label>
+            <input value={addressStreet} onChange={(e) => setAddressStreet(e.target.value)} />
+          </div>
+          <div className="field" style={{ flex: 1 }}>
+            <label>Número</label>
+            <input value={addressNumber} onChange={(e) => setAddressNumber(e.target.value)} />
+          </div>
+        </div>
+        <div className="field">
+          <label>Complemento (opcional)</label>
+          <input value={addressComplement} onChange={(e) => setAddressComplement(e.target.value)} />
+        </div>
+        <div style={{ display: 'flex', gap: 14 }}>
+          <div className="field" style={{ flex: 1 }}>
+            <label>Bairro (opcional)</label>
+            <input value={addressNeighborhood} onChange={(e) => setAddressNeighborhood(e.target.value)} />
+          </div>
+          <div className="field" style={{ flex: 2 }}>
+            <label>Cidade</label>
+            <input value={addressCity} onChange={(e) => setAddressCity(e.target.value)} />
+          </div>
+          <div className="field" style={{ flex: 0.6 }}>
+            <label>Estado</label>
+            <input maxLength={2} value={addressState} onChange={(e) => setAddressState(e.target.value.toUpperCase())} />
+          </div>
+        </div>
+        <div className="field" style={{ marginBottom: 0, maxWidth: 200 }}>
+          <label>CEP (opcional)</label>
+          <input value={addressZipCode} onChange={(e) => setAddressZipCode(e.target.value)} />
+        </div>
+      </div>
+
+      <div className="field-group">
+        <div className="field-group__label">CNH (opcional)</div>
+        <div className="field">
+          <label>Número da CNH</label>
+          <input value={driverLicenseNumber} onChange={(e) => setDriverLicenseNumber(e.target.value)} />
+        </div>
+        <div className="field" style={{ marginBottom: 0 }}>
+          <label>Categoria</label>
+          <input value={driverLicenseCategory} onChange={(e) => setDriverLicenseCategory(e.target.value)} placeholder="Ex: B, AB" />
+        </div>
+      </div>
+
+      <div className="field-group">
+        <div className="field-group__label">Dados bancários (opcional)</div>
+        <div className="field">
+          <label>Banco</label>
+          <input value={bankName} onChange={(e) => setBankName(e.target.value)} />
+        </div>
+        <div className="field">
+          <label>Agência</label>
+          <input value={bankAgency} onChange={(e) => setBankAgency(e.target.value)} />
+        </div>
+        <div className="field">
+          <label>Conta</label>
+          <input value={bankAccount} onChange={(e) => setBankAccount(e.target.value)} />
+        </div>
+        <div className="field" style={{ marginBottom: 0 }}>
+          <label>Chave PIX</label>
+          <input value={pixKey} onChange={(e) => setPixKey(e.target.value)} />
+        </div>
+      </div>
+
+      <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, marginBottom: 14 }}>
+        <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
+        Cliente ativo
+      </label>
+
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button className="btn" type="submit" disabled={submitting}>
+          {submitting ? 'Salvando...' : 'Salvar alterações'}
+        </button>
+        <button type="button" className="logout-btn" style={{ color: 'var(--ink-muted)', borderColor: 'var(--border)' }} onClick={onCancel}>
+          Cancelar
+        </button>
+      </div>
     </form>
   );
 }

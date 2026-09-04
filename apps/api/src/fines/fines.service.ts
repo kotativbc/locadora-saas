@@ -96,7 +96,17 @@ export class FinesService {
       throw new ForbiddenException('Você não tem acesso a esta multa.');
     }
 
-    const updated = await this.prisma.fine.update({ where: { id }, data: dto });
+    const updated = await this.prisma.fine.update({
+      where: { id },
+      data: {
+        infractionDate: dto.infractionDate ? new Date(dto.infractionDate) : undefined,
+        dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
+        amount: dto.amount,
+        description: dto.description,
+        documentNumber: dto.documentNumber,
+        status: dto.status,
+      },
+    });
 
     await this.auditLog.record({
       action: 'fine.update',

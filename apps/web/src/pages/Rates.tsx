@@ -18,6 +18,10 @@ interface RatePlan {
   dailyRate: string;
   weeklyRate: string | null;
   monthlyRate: string | null;
+  kmAllowancePerDay: number | null;
+  kmAllowancePerMonth: number | null;
+  extraKmRate: string | null;
+  cautionAmount: string | null;
   active: boolean;
 }
 
@@ -31,6 +35,7 @@ export function Rates() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<RatePlan | null>(null);
 
   async function load() {
     setLoading(true);
@@ -117,6 +122,13 @@ export function Rates() {
                   <td>
                     <button
                       className="logout-btn"
+                      style={{ color: 'var(--primary)', borderColor: 'var(--border)', marginRight: 6 }}
+                      onClick={() => setEditTarget(r)}
+                    >
+                      Editar
+                    </button>
+                    <button
+                      className="logout-btn"
                       style={{ color: 'var(--rtv-danger)', borderColor: 'var(--border)' }}
                       onClick={() => handleDelete(r)}
                     >
@@ -132,6 +144,14 @@ export function Rates() {
 
       {formOpen && (
         <NewRatePlanForm vehicles={vehicles} onCreated={() => { setFormOpen(false); load(); }} />
+      )}
+
+      {editTarget && (
+        <EditRatePlanForm
+          ratePlan={editTarget}
+          onSaved={() => { setEditTarget(null); load(); }}
+          onCancel={() => setEditTarget(null)}
+        />
       )}
     </div>
   );
@@ -243,6 +263,100 @@ function NewRatePlanForm({ vehicles, onCreated }: { vehicles: Vehicle[]; onCreat
       <button className="btn" type="submit" disabled={submitting}>
         {submitting ? 'Cadastrando...' : 'Cadastrar tarifa'}
       </button>
+    </form>
+  );
+}
+
+function EditRatePlanForm({
+  ratePlan,
+  onSaved,
+  onCancel,
+}: {
+  ratePlan: RatePlan;
+  onSaved: () => void;
+  onCancel: () => void;
+}) {
+  const [name, setName] = useState(ratePlan.name);
+  const [dailyRate, setDailyRate] = useState(ratePlan.dailyRate);
+  const [weeklyRate, setWeeklyRate] = useState(ratePlan.weeklyRate ?? '');
+  const [monthlyRate, setMonthlyRate] = useState(ratePlan.monthlyRate ?? '');
+  const [kmAllowancePerMonth, setKmAllowancePerMonth] = useState(ratePlan.kmAllowancePerMonth?.toString() ?? '');
+  const [extraKmRate, setExtraKmRate] = useState(ratePlan.extraKmRate ?? '');
+  const [cautionAmount, setCautionAmount] = useState(ratePlan.cautionAmount ?? '');
+  const [active, setActive] = useState(ratePlan.active);
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    try {
+      await api.patch(`/rate-plans/${ratePlan.id}`, {
+        name,
+        dailyRate,
+        weeklyRate: weeklyRate || undefined,
+        monthlyRate: monthlyRate || undefined,
+        kmAllowancePerMonth: kmAllowancePerMonth ? Number(kmAllowancePerMonth) : undefined,
+        extraKmRate: extraKmRate || undefined,
+        cautionAmount: cautionAmount || undefined,
+        active,
+      });
+      onSaved();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erro ao salvar a tarifa.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <form className="card" onSubmit={handleSubmit}>
+      <h3 style={{ marginTop: 0 }}>Editar tarifa — {ratePlan.name}</h3>
+      {error && <div className="error-banner">{error}</div>}
+      <div className="field">
+        <label>Nome</label>
+        <input required value={name} onChange={(e) => setName(e.target.value)} />
+      </div>
+      <div className="field">
+        <label>Diária (R$)</label>
+        <input required type="number" step="0.01" inputMode="decimal" min="0" value={dailyRate} onChange={(e) => setDailyRate(e.target.value)} />
+      </div>
+      <div className="field">
+        <label>Semanal (R$, opcional)</label>
+        <input type="number" step="0.01" inputMode="decimal" min="0" value={weeklyRate} onChange={(e) => setWeeklyRate(e.target.value)} />
+      </div>
+      <div className="field">
+        <label>Mensal (R$, opcional)</label>
+        <input type="number" step="0.01" inputMode="decimal" min="0" value={monthlyRate} onChange={(e) => setMonthlyRate(e.target.value)} />
+      </div>
+      <div className="field-group">
+        <div className="field-group__label">Pra Padrão com Proteção Total / Motorista de App</div>
+        <div className="field">
+          <label>Limite de KM mensal</label>
+          <input type="text" inputMode="numeric" value={kmAllowancePerMonth} onChange={(e) => setKmAllowancePerMonth(e.target.value.replace(/\D/g, ''))} />
+        </div>
+        <div className="field">
+          <label>Valor do KM excedente (R$)</label>
+          <input type="number" step="0.01" inputMode="decimal" min="0" value={extraKmRate} onChange={(e) => setExtraKmRate(e.target.value)} />
+        </div>
+        <div className="field" style={{ marginBottom: 0 }}>
+          <label>Caução (R$)</label>
+          <input type="number" step="0.01" inputMode="decimal" min="0" value={cautionAmount} onChange={(e) => setCautionAmount(e.target.value)} />
+        </div>
+      </div>
+      <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, margin: '14px 0' }}>
+        <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
+        Tarifa ativa
+      </label>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button className="btn" type="submit" disabled={submitting}>
+          {submitting ? 'Salvando...' : 'Salvar alterações'}
+        </button>
+        <button type="button" className="logout-btn" style={{ color: 'var(--ink-muted)', borderColor: 'var(--border)' }} onClick={onCancel}>
+          Cancelar
+        </button>
+      </div>
     </form>
   );
 }

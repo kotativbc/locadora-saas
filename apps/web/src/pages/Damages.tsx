@@ -54,6 +54,7 @@ export function Damages() {
   const [error, setError] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [editTarget, setEditTarget] = useState<DamageRecord | null>(null);
 
   async function load() {
     setLoading(true);
@@ -142,6 +143,13 @@ export function Damages() {
                     />
                   </td>
                   <td>
+                    <button
+                      className="logout-btn"
+                      style={{ color: 'var(--primary)', borderColor: 'var(--border)', marginRight: 6 }}
+                      onClick={() => setEditTarget(d)}
+                    >
+                      Editar
+                    </button>
                     {d.status === 'open' && (
                       <button
                         className="logout-btn"
@@ -162,6 +170,14 @@ export function Damages() {
 
       {formOpen && (
         <NewDamageForm vehicles={vehicles} customers={customers} contracts={contracts} onCreated={() => { setFormOpen(false); load(); }} />
+      )}
+
+      {editTarget && (
+        <EditDamageForm
+          damage={editTarget}
+          onSaved={() => { setEditTarget(null); load(); }}
+          onCancel={() => setEditTarget(null)}
+        />
       )}
     </div>
   );
@@ -307,6 +323,86 @@ function NewDamageForm({
       <button className="btn" type="submit" disabled={submitting}>
         {submitting ? 'Salvando...' : 'Registrar avaria'}
       </button>
+    </form>
+  );
+}
+
+function EditDamageForm({
+  damage,
+  onSaved,
+  onCancel,
+}: {
+  damage: DamageRecord;
+  onSaved: () => void;
+  onCancel: () => void;
+}) {
+  const [description, setDescription] = useState(damage.description);
+  const [severity, setSeverity] = useState<'minor' | 'moderate' | 'severe'>(damage.severity as 'minor' | 'moderate' | 'severe');
+  const [estimatedCost, setEstimatedCost] = useState(damage.estimatedCost ?? '');
+  const [chargeToCustomer, setChargeToCustomer] = useState(damage.chargeToCustomer);
+  const [status, setStatus] = useState<'open' | 'resolved'>(damage.status as 'open' | 'resolved');
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    try {
+      await api.patch(`/damages/${damage.id}`, {
+        description,
+        severity,
+        estimatedCost: estimatedCost || undefined,
+        chargeToCustomer,
+        status,
+      });
+      onSaved();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erro ao salvar a avaria.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <form className="card" onSubmit={handleSubmit}>
+      <h3 style={{ marginTop: 0 }}>Editar avaria — {damage.vehicle.plate}</h3>
+      {error && <div className="error-banner">{error}</div>}
+      <div className="field">
+        <label>Descrição</label>
+        <input required value={description} onChange={(e) => setDescription(e.target.value)} />
+      </div>
+      <div className="field">
+        <label>Gravidade</label>
+        <select value={severity} onChange={(e) => setSeverity(e.target.value as typeof severity)}>
+          <option value="minor">Leve</option>
+          <option value="moderate">Moderada</option>
+          <option value="severe">Grave</option>
+        </select>
+      </div>
+      <div className="field">
+        <label>Custo estimado (R$, opcional)</label>
+        <input type="number" step="0.01" inputMode="decimal" min="0" value={estimatedCost} onChange={(e) => setEstimatedCost(e.target.value)} />
+      </div>
+      <div className="field">
+        <label>Status</label>
+        <select value={status} onChange={(e) => setStatus(e.target.value as typeof status)}>
+          <option value="open">Em aberto</option>
+          <option value="resolved">Resolvida</option>
+        </select>
+      </div>
+      <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, marginBottom: 14 }}>
+        <input type="checkbox" checked={chargeToCustomer} onChange={(e) => setChargeToCustomer(e.target.checked)} />
+        Cobrar do cliente
+      </label>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button className="btn" type="submit" disabled={submitting}>
+          {submitting ? 'Salvando...' : 'Salvar alterações'}
+        </button>
+        <button type="button" className="logout-btn" style={{ color: 'var(--ink-muted)', borderColor: 'var(--border)' }} onClick={onCancel}>
+          Cancelar
+        </button>
+      </div>
     </form>
   );
 }

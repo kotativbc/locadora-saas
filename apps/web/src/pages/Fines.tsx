@@ -27,8 +27,10 @@ interface ContractOption {
 interface Fine {
   id: string;
   infractionDate: string;
+  dueDate: string | null;
   amount: string;
   description: string;
+  documentNumber: string | null;
   status: string;
   chargeToCustomer: boolean;
   vehicle: { plate: string; brand: string; model: string };
@@ -53,6 +55,7 @@ export function Fines() {
   const [error, setError] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [editTarget, setEditTarget] = useState<Fine | null>(null);
 
   async function load() {
     setLoading(true);
@@ -121,6 +124,7 @@ export function Fines() {
                 <th>Valor</th>
                 <th>Cobrar do cliente</th>
                 <th>Status</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -141,6 +145,15 @@ export function Fines() {
                       onChange={(status) => handleStatusChange(f.id, status)}
                     />
                   </td>
+                  <td>
+                    <button
+                      className="logout-btn"
+                      style={{ color: 'var(--primary)', borderColor: 'var(--border)' }}
+                      onClick={() => setEditTarget(f)}
+                    >
+                      Editar
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -150,6 +163,14 @@ export function Fines() {
 
       {formOpen && (
         <NewFineForm vehicles={vehicles} customers={customers} contracts={contracts} onCreated={() => { setFormOpen(false); load(); }} />
+      )}
+
+      {editTarget && (
+        <EditFineForm
+          fine={editTarget}
+          onSaved={() => { setEditTarget(null); load(); }}
+          onCancel={() => setEditTarget(null)}
+        />
       )}
     </div>
   );
@@ -303,6 +324,89 @@ function NewFineForm({
       <button className="btn" type="submit" disabled={submitting}>
         {submitting ? 'Salvando...' : 'Registrar multa'}
       </button>
+    </form>
+  );
+}
+
+function EditFineForm({
+  fine,
+  onSaved,
+  onCancel,
+}: {
+  fine: Fine;
+  onSaved: () => void;
+  onCancel: () => void;
+}) {
+  const [infractionDate, setInfractionDate] = useState(fine.infractionDate.slice(0, 10));
+  const [dueDate, setDueDate] = useState(fine.dueDate ? fine.dueDate.slice(0, 10) : '');
+  const [amount, setAmount] = useState(fine.amount);
+  const [description, setDescription] = useState(fine.description);
+  const [documentNumber, setDocumentNumber] = useState(fine.documentNumber ?? '');
+  const [status, setStatus] = useState<'pending' | 'paid' | 'contested'>(fine.status as 'pending' | 'paid' | 'contested');
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    try {
+      await api.patch(`/fines/${fine.id}`, {
+        infractionDate: new Date(infractionDate).toISOString(),
+        dueDate: dueDate ? new Date(dueDate).toISOString() : undefined,
+        amount,
+        description,
+        documentNumber: documentNumber || undefined,
+        status,
+      });
+      onSaved();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erro ao salvar a multa.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <form className="card" onSubmit={handleSubmit}>
+      <h3 style={{ marginTop: 0 }}>Editar multa — {fine.vehicle.plate}</h3>
+      {error && <div className="error-banner">{error}</div>}
+      <div className="field">
+        <label>Data da infração</label>
+        <input required type="date" value={infractionDate} onChange={(e) => setInfractionDate(e.target.value)} />
+      </div>
+      <div className="field">
+        <label>Vencimento (opcional)</label>
+        <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+      </div>
+      <div className="field">
+        <label>Valor (R$)</label>
+        <input required type="number" step="0.01" inputMode="decimal" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} />
+      </div>
+      <div className="field">
+        <label>Descrição da infração</label>
+        <input required value={description} onChange={(e) => setDescription(e.target.value)} />
+      </div>
+      <div className="field">
+        <label>Nº do AIT/notificação (opcional)</label>
+        <input value={documentNumber} onChange={(e) => setDocumentNumber(e.target.value)} />
+      </div>
+      <div className="field" style={{ marginBottom: 14 }}>
+        <label>Status</label>
+        <select value={status} onChange={(e) => setStatus(e.target.value as typeof status)}>
+          <option value="pending">Pendente</option>
+          <option value="paid">Paga</option>
+          <option value="contested">Contestada</option>
+        </select>
+      </div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button className="btn" type="submit" disabled={submitting}>
+          {submitting ? 'Salvando...' : 'Salvar alterações'}
+        </button>
+        <button type="button" className="logout-btn" style={{ color: 'var(--ink-muted)', borderColor: 'var(--border)' }} onClick={onCancel}>
+          Cancelar
+        </button>
+      </div>
     </form>
   );
 }

@@ -12,6 +12,7 @@ import { PlanLimitsService } from '../plans/plan-limits.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { RequestUser } from '../auth/types';
+import { RoleCode } from '../rbac/rbac.constants';
 
 const USER_LIST_SELECT = {
   id: true,
@@ -83,9 +84,32 @@ export class UsersService {
   async update(id: string, dto: UpdateUserDto, actor: RequestUser) {
     const user = await this.findAndAssertSameCompany(id, actor);
 
+    // Trava de segurança: ninguém pode se auto-rebaixar ou se autodesativar —
+    // evita a pessoa se trancar pra fora do próprio sistema sem querer.
+    const isSelf = actor.id === id;
+    if (isSelf && dto.active === false) {
+      throw new ForbiddenException('Você não pode desativar sua própria conta.');
+    }
+    if (isSelf && dto.roleCode && dto.roleCode !== RoleCode.COMPANY_ADMIN) {
+      throw new ForbiddenException('Você não pode remover seu próprio papel de administrador.');
+    }
+
+    if (dto.email && dto.email !== user.email) {
+      const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
+      if (existing) {
+        throw new ConflictException('Já existe um usuário com este e-mail.');
+      }
+    }
+
+    if (dto.roleCode) {
+      const role = await this.prisma.role.findUniqueOrThrow({ where: { code: dto.roleCode } });
+      await this.prisma.userRole.deleteMany({ where: { userId: id } });
+      await this.prisma.userRole.create({ data: { userId: id, roleId: role.id } });
+    }
+
     const updated = await this.prisma.user.update({
       where: { id: user.id },
-      data: dto,
+      data: { name: dto.name, email: dto.email, active: dto.active },
       select: { id: true, name: true, email: true, active: true },
     });
 

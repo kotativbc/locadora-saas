@@ -11,6 +11,7 @@ interface Vehicle {
 
 interface Expense {
   id: string;
+  vehicleId: string | null;
   category: string;
   description: string;
   amount: string;
@@ -35,6 +36,7 @@ export function Expenses() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<Expense | null>(null);
 
   async function load() {
     setLoading(true);
@@ -83,6 +85,7 @@ export function Expenses() {
                 <th>Veículo</th>
                 <th>Data</th>
                 <th>Valor</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -101,6 +104,15 @@ export function Expenses() {
                   </td>
                   <td>{new Date(e.incurredAt).toLocaleDateString('pt-BR')}</td>
                   <td>{formatCurrency(e.amount)}</td>
+                  <td>
+                    <button
+                      className="logout-btn"
+                      style={{ color: 'var(--primary)', borderColor: 'var(--border)' }}
+                      onClick={() => setEditTarget(e)}
+                    >
+                      Editar
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -109,6 +121,15 @@ export function Expenses() {
       </div>
 
       {formOpen && <NewExpenseForm vehicles={vehicles} onCreated={() => { setFormOpen(false); load(); }} />}
+
+      {editTarget && (
+        <EditExpenseForm
+          expense={editTarget}
+          vehicles={vehicles}
+          onSaved={() => { setEditTarget(null); load(); }}
+          onCancel={() => setEditTarget(null)}
+        />
+      )}
     </div>
   );
 }
@@ -183,6 +204,95 @@ function NewExpenseForm({ vehicles, onCreated }: { vehicles: Vehicle[]; onCreate
       <button className="btn" type="submit" disabled={submitting}>
         {submitting ? 'Salvando...' : 'Registrar despesa'}
       </button>
+    </form>
+  );
+}
+
+function EditExpenseForm({
+  expense,
+  vehicles,
+  onSaved,
+  onCancel,
+}: {
+  expense: Expense;
+  vehicles: Vehicle[];
+  onSaved: () => void;
+  onCancel: () => void;
+}) {
+  const [vehicleId, setVehicleId] = useState(expense.vehicleId ?? '');
+  const [category, setCategory] = useState<'maintenance' | 'fuel' | 'insurance' | 'other'>(
+    expense.category as 'maintenance' | 'fuel' | 'insurance' | 'other',
+  );
+  const [description, setDescription] = useState(expense.description);
+  const [amount, setAmount] = useState(expense.amount);
+  const [incurredAt, setIncurredAt] = useState(expense.incurredAt.slice(0, 10));
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    try {
+      await api.patch(`/expenses/${expense.id}`, {
+        vehicleId: vehicleId || undefined,
+        category,
+        description,
+        amount,
+        incurredAt: new Date(incurredAt).toISOString(),
+      });
+      onSaved();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erro ao salvar a despesa.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <form className="card" onSubmit={handleSubmit}>
+      <h3 style={{ marginTop: 0 }}>Editar despesa</h3>
+      {error && <div className="error-banner">{error}</div>}
+      <div className="field">
+        <label>Veículo (opcional)</label>
+        <select value={vehicleId} onChange={(e) => setVehicleId(e.target.value)}>
+          <option value="">Nenhum</option>
+          {vehicles.map((v) => (
+            <option key={v.id} value={v.id}>
+              {v.plate} — {v.brand} {v.model}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="field">
+        <label>Categoria</label>
+        <select value={category} onChange={(e) => setCategory(e.target.value as typeof category)}>
+          <option value="maintenance">Manutenção</option>
+          <option value="fuel">Combustível</option>
+          <option value="insurance">Seguro</option>
+          <option value="other">Outro</option>
+        </select>
+      </div>
+      <div className="field">
+        <label>Descrição</label>
+        <input required value={description} onChange={(e) => setDescription(e.target.value)} />
+      </div>
+      <div className="field">
+        <label>Valor (R$)</label>
+        <input required type="number" step="0.01" inputMode="decimal" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} />
+      </div>
+      <div className="field" style={{ marginBottom: 14 }}>
+        <label>Data</label>
+        <input required type="date" value={incurredAt} onChange={(e) => setIncurredAt(e.target.value)} />
+      </div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button className="btn" type="submit" disabled={submitting}>
+          {submitting ? 'Salvando...' : 'Salvar alterações'}
+        </button>
+        <button type="button" className="logout-btn" style={{ color: 'var(--ink-muted)', borderColor: 'var(--border)' }} onClick={onCancel}>
+          Cancelar
+        </button>
+      </div>
     </form>
   );
 }

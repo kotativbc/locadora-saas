@@ -16,6 +16,10 @@ interface Claim {
   occurredAt: string;
   location: string | null;
   description: string;
+  policeReportNumber: string | null;
+  thirdPartyInvolved: boolean;
+  thirdPartyDescription: string | null;
+  insuranceClaimNumber: string | null;
   status: string;
   estimatedCost: string | null;
   vehicle: { plate: string; brand: string; model: string };
@@ -46,6 +50,7 @@ export function Claims() {
   const [error, setError] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [editTarget, setEditTarget] = useState<Claim | null>(null);
 
   async function load() {
     setLoading(true);
@@ -107,6 +112,7 @@ export function Claims() {
                 <th>Descrição</th>
                 <th>Custo estimado</th>
                 <th>Status</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -127,6 +133,15 @@ export function Claims() {
                       onChange={(status) => handleStatusChange(c.id, status)}
                     />
                   </td>
+                  <td>
+                    <button
+                      className="logout-btn"
+                      style={{ color: 'var(--primary)', borderColor: 'var(--border)' }}
+                      onClick={() => setEditTarget(c)}
+                    >
+                      Editar
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -135,6 +150,14 @@ export function Claims() {
       </div>
 
       {formOpen && <NewClaimForm vehicles={vehicles} onCreated={() => { setFormOpen(false); load(); }} />}
+
+      {editTarget && (
+        <EditClaimForm
+          claim={editTarget}
+          onSaved={() => { setEditTarget(null); load(); }}
+          onCancel={() => setEditTarget(null)}
+        />
+      )}
     </div>
   );
 }
@@ -232,6 +255,123 @@ function NewClaimForm({ vehicles, onCreated }: { vehicles: Vehicle[]; onCreated:
       <button className="btn" type="submit" disabled={submitting}>
         {submitting ? 'Salvando...' : 'Registrar sinistro'}
       </button>
+    </form>
+  );
+}
+
+function EditClaimForm({
+  claim,
+  onSaved,
+  onCancel,
+}: {
+  claim: Claim;
+  onSaved: () => void;
+  onCancel: () => void;
+}) {
+  const [type, setType] = useState<'accident' | 'theft' | 'fire' | 'other'>(claim.type as 'accident' | 'theft' | 'fire' | 'other');
+  const [occurredAt, setOccurredAt] = useState(claim.occurredAt.slice(0, 10));
+  const [location, setLocation] = useState(claim.location ?? '');
+  const [description, setDescription] = useState(claim.description);
+  const [policeReportNumber, setPoliceReportNumber] = useState(claim.policeReportNumber ?? '');
+  const [thirdPartyInvolved, setThirdPartyInvolved] = useState(claim.thirdPartyInvolved);
+  const [thirdPartyDescription, setThirdPartyDescription] = useState(claim.thirdPartyDescription ?? '');
+  const [insuranceClaimNumber, setInsuranceClaimNumber] = useState(claim.insuranceClaimNumber ?? '');
+  const [estimatedCost, setEstimatedCost] = useState(claim.estimatedCost ?? '');
+  const [status, setStatus] = useState<'open' | 'in_progress' | 'resolved' | 'closed'>(
+    claim.status as 'open' | 'in_progress' | 'resolved' | 'closed',
+  );
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    try {
+      await api.patch(`/claims/${claim.id}`, {
+        type,
+        occurredAt: new Date(occurredAt).toISOString(),
+        location: location || undefined,
+        description,
+        policeReportNumber: policeReportNumber || undefined,
+        thirdPartyInvolved,
+        thirdPartyDescription: thirdPartyDescription || undefined,
+        insuranceClaimNumber: insuranceClaimNumber || undefined,
+        estimatedCost: estimatedCost || undefined,
+        status,
+      });
+      onSaved();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erro ao salvar o sinistro.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <form className="card" onSubmit={handleSubmit}>
+      <h3 style={{ marginTop: 0 }}>Editar sinistro — {claim.vehicle.plate}</h3>
+      {error && <div className="error-banner">{error}</div>}
+      <div className="field">
+        <label>Tipo</label>
+        <select value={type} onChange={(e) => setType(e.target.value as typeof type)}>
+          <option value="accident">Acidente</option>
+          <option value="theft">Roubo/Furto</option>
+          <option value="fire">Incêndio</option>
+          <option value="other">Outro</option>
+        </select>
+      </div>
+      <div className="field">
+        <label>Data</label>
+        <input required type="date" value={occurredAt} onChange={(e) => setOccurredAt(e.target.value)} />
+      </div>
+      <div className="field">
+        <label>Local (opcional)</label>
+        <input value={location} onChange={(e) => setLocation(e.target.value)} />
+      </div>
+      <div className="field">
+        <label>Descrição</label>
+        <input required value={description} onChange={(e) => setDescription(e.target.value)} />
+      </div>
+      <div className="field">
+        <label>Boletim de Ocorrência (opcional)</label>
+        <input value={policeReportNumber} onChange={(e) => setPoliceReportNumber(e.target.value)} />
+      </div>
+      <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, marginBottom: 12 }}>
+        <input type="checkbox" checked={thirdPartyInvolved} onChange={(e) => setThirdPartyInvolved(e.target.checked)} />
+        Envolveu terceiros
+      </label>
+      {thirdPartyInvolved && (
+        <div className="field">
+          <label>Descrição do terceiro envolvido</label>
+          <input value={thirdPartyDescription} onChange={(e) => setThirdPartyDescription(e.target.value)} />
+        </div>
+      )}
+      <div className="field">
+        <label>Nº do sinistro no seguro (opcional)</label>
+        <input value={insuranceClaimNumber} onChange={(e) => setInsuranceClaimNumber(e.target.value)} />
+      </div>
+      <div className="field">
+        <label>Custo estimado (R$, opcional)</label>
+        <input type="number" step="0.01" inputMode="decimal" min="0" value={estimatedCost} onChange={(e) => setEstimatedCost(e.target.value)} />
+      </div>
+      <div className="field" style={{ marginBottom: 14 }}>
+        <label>Status</label>
+        <select value={status} onChange={(e) => setStatus(e.target.value as typeof status)}>
+          <option value="open">Aberto</option>
+          <option value="in_progress">Em andamento</option>
+          <option value="resolved">Resolvido</option>
+          <option value="closed">Fechado</option>
+        </select>
+      </div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button className="btn" type="submit" disabled={submitting}>
+          {submitting ? 'Salvando...' : 'Salvar alterações'}
+        </button>
+        <button type="button" className="logout-btn" style={{ color: 'var(--ink-muted)', borderColor: 'var(--border)' }} onClick={onCancel}>
+          Cancelar
+        </button>
+      </div>
     </form>
   );
 }

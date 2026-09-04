@@ -78,6 +78,10 @@ export class ChargesService {
     const updated = await this.prisma.charge.update({
       where: { id },
       data: {
+        type: dto.type,
+        description: dto.description,
+        amount: dto.amount,
+        dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
         status: dto.status,
         paidAt: dto.status === 'paid' ? new Date() : dto.status === 'pending' ? null : undefined,
       },

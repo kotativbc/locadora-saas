@@ -1,7 +1,7 @@
 import { IsEmail, IsEnum, IsString, MinLength } from 'class-validator';
 import { RoleCode } from '../../rbac/rbac.constants';
 
-const COMPANY_SCOPED_ROLES = [
+export const COMPANY_SCOPED_ROLES = [
   RoleCode.COMPANY_ADMIN,
   RoleCode.FLEET_MANAGER,
   RoleCode.AGENT,

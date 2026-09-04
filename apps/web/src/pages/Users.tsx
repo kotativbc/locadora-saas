@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { api, ApiError } from '../api';
 import { EmptyState } from '../components/EmptyState';
+import { useAuth } from '../auth/AuthContext';
 
 interface UserRow {
   id: string;
@@ -20,10 +21,12 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 export function Users() {
+  const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<UserRow | null>(null);
 
   async function load() {
     setLoading(true);
@@ -70,6 +73,7 @@ export function Users() {
                 <th>Papel</th>
                 <th>Status</th>
                 <th>Último acesso</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -80,6 +84,15 @@ export function Users() {
                   <td>{u.roles.map((r) => ROLE_LABELS[r.role.code] ?? r.role.code).join(', ')}</td>
                   <td>{u.active ? 'Ativo' : 'Inativo'}</td>
                   <td>{u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString('pt-BR') : 'Nunca'}</td>
+                  <td>
+                    <button
+                      className="logout-btn"
+                      style={{ color: 'var(--primary)', borderColor: 'var(--border)' }}
+                      onClick={() => setEditTarget(u)}
+                    >
+                      Editar
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -88,6 +101,15 @@ export function Users() {
       </div>
 
       {formOpen && <NewUserForm onCreated={() => { setFormOpen(false); load(); }} />}
+
+      {editTarget && (
+        <EditUserForm
+          targetUser={editTarget}
+          isSelf={currentUser?.id === editTarget.id}
+          onSaved={() => { setEditTarget(null); load(); }}
+          onCancel={() => setEditTarget(null)}
+        />
+      )}
     </div>
   );
 }
@@ -143,6 +165,82 @@ function NewUserForm({ onCreated }: { onCreated: () => void }) {
       <button className="btn" type="submit" disabled={submitting}>
         {submitting ? 'Criando...' : 'Criar usuário'}
       </button>
+    </form>
+  );
+}
+
+function EditUserForm({
+  targetUser,
+  isSelf,
+  onSaved,
+  onCancel,
+}: {
+  targetUser: UserRow;
+  isSelf: boolean;
+  onSaved: () => void;
+  onCancel: () => void;
+}) {
+  const [name, setName] = useState(targetUser.name);
+  const [email, setEmail] = useState(targetUser.email);
+  const [roleCode, setRoleCode] = useState(targetUser.roles[0]?.role.code ?? 'AGENT');
+  const [active, setActive] = useState(targetUser.active);
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    try {
+      await api.patch(`/users/${targetUser.id}`, { name, email, roleCode, active });
+      onSaved();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erro ao salvar o usuário.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <form className="card" onSubmit={handleSubmit}>
+      <h3 style={{ marginTop: 0 }}>Editar usuário</h3>
+      {error && <div className="error-banner">{error}</div>}
+      {isSelf && (
+        <p style={{ fontSize: 12.5, color: 'var(--rtv-warning)', marginTop: -4, marginBottom: 14 }}>
+          Este é o seu próprio usuário — por segurança, não dá pra se desativar nem remover seu próprio papel de
+          administrador (evita você se trancar pra fora do sistema sem querer).
+        </p>
+      )}
+      <div className="field">
+        <label>Nome</label>
+        <input required value={name} onChange={(e) => setName(e.target.value)} />
+      </div>
+      <div className="field">
+        <label>E-mail</label>
+        <input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+      </div>
+      <div className="field">
+        <label>Papel</label>
+        <select value={roleCode} onChange={(e) => setRoleCode(e.target.value)} disabled={isSelf}>
+          {Object.entries(ROLE_LABELS).map(([code, label]) => (
+            <option key={code} value={code}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </div>
+      <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, margin: '14px 0' }}>
+        <input type="checkbox" checked={active} disabled={isSelf} onChange={(e) => setActive(e.target.checked)} />
+        Usuário ativo
+      </label>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button className="btn" type="submit" disabled={submitting}>
+          {submitting ? 'Salvando...' : 'Salvar alterações'}
+        </button>
+        <button type="button" className="logout-btn" style={{ color: 'var(--ink-muted)', borderColor: 'var(--border)' }} onClick={onCancel}>
+          Cancelar
+        </button>
+      </div>
     </form>
   );
 }

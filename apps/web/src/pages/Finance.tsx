@@ -53,6 +53,7 @@ export function Finance() {
   const [error, setError] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [editTarget, setEditTarget] = useState<Charge | null>(null);
 
   async function load() {
     setLoading(true);
@@ -162,6 +163,13 @@ export function Finance() {
                   <td>
                     <button
                       className="logout-btn"
+                      style={{ color: 'var(--primary)', borderColor: 'var(--border)', marginRight: 6 }}
+                      onClick={() => setEditTarget(c)}
+                    >
+                      Editar
+                    </button>
+                    <button
+                      className="logout-btn"
                       style={{ color: 'var(--rtv-danger)', borderColor: 'var(--border)' }}
                       onClick={() => handleDelete(c)}
                     >
@@ -177,6 +185,14 @@ export function Finance() {
 
       {formOpen && (
         <NewChargeForm customers={customers} contracts={contracts} onCreated={() => { setFormOpen(false); load(); }} />
+      )}
+
+      {editTarget && (
+        <EditChargeForm
+          charge={editTarget}
+          onSaved={() => { setEditTarget(null); load(); }}
+          onCancel={() => setEditTarget(null)}
+        />
       )}
     </div>
   );
@@ -291,6 +307,88 @@ function NewChargeForm({
       <button className="btn" type="submit" disabled={submitting}>
         {submitting ? 'Salvando...' : 'Criar lançamento'}
       </button>
+    </form>
+  );
+}
+
+function EditChargeForm({
+  charge,
+  onSaved,
+  onCancel,
+}: {
+  charge: Charge;
+  onSaved: () => void;
+  onCancel: () => void;
+}) {
+  const [type, setType] = useState<'rental' | 'damage' | 'fine' | 'other'>(charge.type as 'rental' | 'damage' | 'fine' | 'other');
+  const [description, setDescription] = useState(charge.description);
+  const [amount, setAmount] = useState(charge.amount);
+  const [dueDate, setDueDate] = useState(charge.dueDate ? charge.dueDate.slice(0, 10) : '');
+  const [status, setStatus] = useState<'pending' | 'paid' | 'cancelled'>(charge.status as 'pending' | 'paid' | 'cancelled');
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    try {
+      await api.patch(`/charges/${charge.id}`, {
+        type,
+        description,
+        amount,
+        dueDate: dueDate ? new Date(dueDate).toISOString() : undefined,
+        status,
+      });
+      onSaved();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erro ao salvar o lançamento.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <form className="card" onSubmit={handleSubmit}>
+      <h3 style={{ marginTop: 0 }}>Editar lançamento</h3>
+      {error && <div className="error-banner">{error}</div>}
+      <div className="field">
+        <label>Tipo</label>
+        <select value={type} onChange={(e) => setType(e.target.value as typeof type)}>
+          <option value="rental">Aluguel</option>
+          <option value="damage">Avaria</option>
+          <option value="fine">Multa</option>
+          <option value="other">Outro</option>
+        </select>
+      </div>
+      <div className="field">
+        <label>Descrição</label>
+        <input required value={description} onChange={(e) => setDescription(e.target.value)} />
+      </div>
+      <div className="field">
+        <label>Valor (R$)</label>
+        <input required type="number" step="0.01" inputMode="decimal" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} />
+      </div>
+      <div className="field">
+        <label>Vencimento (opcional)</label>
+        <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+      </div>
+      <div className="field" style={{ marginBottom: 14 }}>
+        <label>Status</label>
+        <select value={status} onChange={(e) => setStatus(e.target.value as typeof status)}>
+          <option value="pending">Pendente</option>
+          <option value="paid">Pago</option>
+          <option value="cancelled">Cancelado</option>
+        </select>
+      </div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button className="btn" type="submit" disabled={submitting}>
+          {submitting ? 'Salvando...' : 'Salvar alterações'}
+        </button>
+        <button type="button" className="logout-btn" style={{ color: 'var(--ink-muted)', borderColor: 'var(--border)' }} onClick={onCancel}>
+          Cancelar
+        </button>
+      </div>
     </form>
   );
 }

@@ -17,6 +17,8 @@ interface MaintenanceRecord {
   odometerKm: number | null;
   cost: string | null;
   vendor: string | null;
+  nextDueDate: string | null;
+  nextDueKm: number | null;
   vehicle: { plate: string; brand: string; model: string };
 }
 
@@ -35,6 +37,7 @@ export function Maintenance() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<MaintenanceRecord | null>(null);
 
   async function load() {
     setLoading(true);
@@ -87,6 +90,7 @@ export function Maintenance() {
                 <th>Data</th>
                 <th>Odômetro</th>
                 <th>Custo</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -100,6 +104,15 @@ export function Maintenance() {
                   <td>{new Date(r.performedAt).toLocaleDateString('pt-BR')}</td>
                   <td>{r.odometerKm ? `${r.odometerKm.toLocaleString('pt-BR')} km` : '—'}</td>
                   <td>{r.cost ? formatCurrency(r.cost) : '—'}</td>
+                  <td>
+                    <button
+                      className="logout-btn"
+                      style={{ color: 'var(--primary)', borderColor: 'var(--border)' }}
+                      onClick={() => setEditTarget(r)}
+                    >
+                      Editar
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -109,6 +122,14 @@ export function Maintenance() {
 
       {formOpen && (
         <NewMaintenanceForm vehicles={vehicles} onCreated={() => { setFormOpen(false); load(); }} />
+      )}
+
+      {editTarget && (
+        <EditMaintenanceForm
+          record={editTarget}
+          onSaved={() => { setEditTarget(null); load(); }}
+          onCancel={() => setEditTarget(null)}
+        />
       )}
     </div>
   );
@@ -199,6 +220,100 @@ function NewMaintenanceForm({ vehicles, onCreated }: { vehicles: Vehicle[]; onCr
       <button className="btn" type="submit" disabled={submitting}>
         {submitting ? 'Salvando...' : 'Registrar manutenção'}
       </button>
+    </form>
+  );
+}
+
+function EditMaintenanceForm({
+  record,
+  onSaved,
+  onCancel,
+}: {
+  record: MaintenanceRecord;
+  onSaved: () => void;
+  onCancel: () => void;
+}) {
+  const [type, setType] = useState<'preventive' | 'corrective'>(record.type as 'preventive' | 'corrective');
+  const [description, setDescription] = useState(record.description);
+  const [performedAt, setPerformedAt] = useState(record.performedAt.slice(0, 10));
+  const [odometerKm, setOdometerKm] = useState(record.odometerKm?.toString() ?? '');
+  const [cost, setCost] = useState(record.cost ?? '');
+  const [vendor, setVendor] = useState(record.vendor ?? '');
+  const [nextDueDate, setNextDueDate] = useState(record.nextDueDate ? record.nextDueDate.slice(0, 10) : '');
+  const [nextDueKm, setNextDueKm] = useState(record.nextDueKm?.toString() ?? '');
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    try {
+      await api.patch(`/maintenance/${record.id}`, {
+        type,
+        description,
+        performedAt: new Date(performedAt).toISOString(),
+        odometerKm: odometerKm ? Number(odometerKm) : undefined,
+        cost: cost || undefined,
+        vendor: vendor || undefined,
+        nextDueDate: nextDueDate ? new Date(nextDueDate).toISOString() : undefined,
+        nextDueKm: nextDueKm ? Number(nextDueKm) : undefined,
+      });
+      onSaved();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erro ao salvar a manutenção.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <form className="card" onSubmit={handleSubmit}>
+      <h3 style={{ marginTop: 0 }}>Editar manutenção — {record.vehicle.plate}</h3>
+      {error && <div className="error-banner">{error}</div>}
+      <div className="field">
+        <label>Tipo</label>
+        <select value={type} onChange={(e) => setType(e.target.value as typeof type)}>
+          <option value="preventive">Preventiva</option>
+          <option value="corrective">Corretiva</option>
+        </select>
+      </div>
+      <div className="field">
+        <label>Descrição</label>
+        <input required value={description} onChange={(e) => setDescription(e.target.value)} />
+      </div>
+      <div className="field">
+        <label>Data</label>
+        <input required type="date" value={performedAt} onChange={(e) => setPerformedAt(e.target.value)} />
+      </div>
+      <div className="field">
+        <label>Odômetro no momento (opcional)</label>
+        <input type="text" inputMode="numeric" value={odometerKm} onChange={(e) => setOdometerKm(e.target.value.replace(/\D/g, ''))} />
+      </div>
+      <div className="field">
+        <label>Custo (R$, opcional)</label>
+        <input type="number" step="0.01" inputMode="decimal" min="0" value={cost} onChange={(e) => setCost(e.target.value)} />
+      </div>
+      <div className="field">
+        <label>Fornecedor/Oficina (opcional)</label>
+        <input value={vendor} onChange={(e) => setVendor(e.target.value)} />
+      </div>
+      <div className="field">
+        <label>Próxima manutenção — data (opcional)</label>
+        <input type="date" value={nextDueDate} onChange={(e) => setNextDueDate(e.target.value)} />
+      </div>
+      <div className="field" style={{ marginBottom: 14 }}>
+        <label>Próxima manutenção — km (opcional)</label>
+        <input type="text" inputMode="numeric" value={nextDueKm} onChange={(e) => setNextDueKm(e.target.value.replace(/\D/g, ''))} />
+      </div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button className="btn" type="submit" disabled={submitting}>
+          {submitting ? 'Salvando...' : 'Salvar alterações'}
+        </button>
+        <button type="button" className="logout-btn" style={{ color: 'var(--ink-muted)', borderColor: 'var(--border)' }} onClick={onCancel}>
+          Cancelar
+        </button>
+      </div>
     </form>
   );
 }
