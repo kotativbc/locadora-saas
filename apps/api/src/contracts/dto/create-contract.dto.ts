@@ -22,6 +22,14 @@ export class CreateContractDto {
   @IsIn(['standard', 'monthly_app_driver', 'protected'])
   templateType?: 'standard' | 'monthly_app_driver' | 'protected';
 
+  // Controle manual: o sistema sugere o valor a partir da tarifa (dias x diária,
+  // ou o valor mensal cheio), mas quem está criando pode ajustar — útil quando o
+  // período não fecha em meses/dias redondos, ou quando o valor foi negociado
+  // diferente do que a tarifa calcularia sozinha.
+  @IsOptional()
+  @IsNumberString()
+  totalValueOverride?: string;
+
   @IsDateString()
   startDate!: string;
 

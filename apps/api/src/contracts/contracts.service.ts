@@ -95,6 +95,12 @@ export class ContractsService {
     ({ dailyRate, totalValue, monthlyKmLimitSnapshot, extraKmRateSnapshot, cautionAmountSnapshot } =
       await this.computeContractFinancials(dto, templateType, days, actor));
 
+    // Controle manual: se veio um valor ajustado, ele prevalece sobre o calculado
+    // automaticamente (mas os "snapshots" de KM/caução continuam vindo da tarifa).
+    if (dto.totalValueOverride) {
+      totalValue = dto.totalValueOverride;
+    }
+
     const contract = await this.prisma.contract.create({
       data: {
         companyId: actor.companyId,
@@ -245,8 +251,9 @@ export class ContractsService {
 
     const days = daysBetween(startDate, endDate);
     const ratePlanId = dto.ratePlanId ?? contract.ratePlanId ?? undefined;
-    const { dailyRate, totalValue, monthlyKmLimitSnapshot, extraKmRateSnapshot, cautionAmountSnapshot } =
-      await this.computeContractFinancials({ ratePlanId, dailyRate: dto.dailyRate }, templateType, days, actor);
+    const computed = await this.computeContractFinancials({ ratePlanId, dailyRate: dto.dailyRate }, templateType, days, actor);
+    const { dailyRate, monthlyKmLimitSnapshot, extraKmRateSnapshot, cautionAmountSnapshot } = computed;
+    const totalValue = dto.totalValueOverride ?? computed.totalValue;
 
     const updated = await this.prisma.contract.update({
       where: { id },

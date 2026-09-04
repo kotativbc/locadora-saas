@@ -481,11 +481,35 @@ function NewContractForm({
   const [dailyRate, setDailyRate] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [totalValueOverride, setTotalValueOverride] = useState('');
+  const [valueTouched, setValueTouched] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const selectedMonthlyPlan = monthlyPlans.find((r) => r.id === ratePlanId);
   const selectedProtectedPlan = protectedPlans.find((r) => r.id === ratePlanId);
+  const selectedManualPlan = ratePlans.find((r) => r.id === ratePlanId);
+
+  // Sugere um valor automaticamente com base na tarifa/período — mas só enquanto
+  // o usuário não tiver mexido no campo com a própria mão.
+  useEffect(() => {
+    if (valueTouched) return;
+    let suggestion = '';
+    if (templateType === 'monthly_app_driver' && selectedMonthlyPlan?.monthlyRate) {
+      suggestion = Number(selectedMonthlyPlan.monthlyRate).toFixed(2);
+    } else if (startDate && endDate) {
+      const days = Math.max(1, Math.ceil((new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24)));
+      const rate =
+        templateType === 'protected'
+          ? selectedProtectedPlan?.dailyRate
+          : rateMode === 'plan'
+            ? selectedManualPlan?.dailyRate
+            : dailyRate;
+      if (rate) suggestion = (Number(rate) * days).toFixed(2);
+    }
+    setTotalValueOverride(suggestion);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [templateType, ratePlanId, dailyRate, startDate, endDate, rateMode, valueTouched]);
 
   function handleTemplateTypeChange(value: '' | 'standard' | 'monthly_app_driver' | 'protected') {
     setTemplateType(value);
@@ -513,6 +537,7 @@ function NewContractForm({
         templateType,
         ratePlanId: templateType !== 'standard' || rateMode === 'plan' ? ratePlanId : undefined,
         dailyRate: templateType === 'standard' && rateMode === 'manual' ? dailyRate : undefined,
+        totalValueOverride: totalValueOverride || undefined,
         startDate: new Date(startDate).toISOString(),
         endDate: new Date(endDate).toISOString(),
       });
@@ -685,6 +710,36 @@ function NewContractForm({
           <label>Data e hora de devolução prevista{templateType === 'monthly_app_driver' ? ' (fim do ciclo atual)' : ''}</label>
           <input required type="datetime-local" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
         </div>
+      </div>
+
+      <div className="field-group">
+        <div className="field-group__label">Valor total do contrato</div>
+        <div className="field" style={{ marginBottom: 0 }}>
+          <label>Valor (R$) — sugerido a partir da tarifa e do período, mas você pode ajustar</label>
+          <input
+            type="number"
+            step="0.01"
+            inputMode="decimal"
+            min="0"
+            value={totalValueOverride}
+            onChange={(e) => {
+              setTotalValueOverride(e.target.value);
+              setValueTouched(true);
+            }}
+          />
+        </div>
+        {valueTouched && (
+          <p style={{ fontSize: 12, color: 'var(--rtv-amber-600)', marginTop: 8, marginBottom: 0 }}>
+            Valor ajustado manualmente — não vai mais atualizar sozinho se você mudar a tarifa ou as datas.{' '}
+            <button
+              type="button"
+              onClick={() => setValueTouched(false)}
+              style={{ background: 'none', border: 'none', color: 'var(--rtv-teal-600)', textDecoration: 'underline', cursor: 'pointer', padding: 0, font: 'inherit' }}
+            >
+              Voltar a calcular automaticamente
+            </button>
+          </p>
+        )}
       </div>
 
       <button
@@ -1140,6 +1195,7 @@ interface FullContract {
   startDate: string;
   endDate: string;
   dailyRateSnapshot: string;
+  totalValue: string;
   notes: string | null;
 }
 
@@ -1168,6 +1224,7 @@ function EditDraftContractForm({
   const [dailyRate, setDailyRate] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [totalValueOverride, setTotalValueOverride] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -1187,6 +1244,7 @@ function EditDraftContractForm({
         setDailyRate(c.dailyRateSnapshot);
         setStartDate(c.startDate.slice(0, 16));
         setEndDate(c.endDate.slice(0, 16));
+        setTotalValueOverride(c.totalValue);
       })
       .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Erro ao carregar contrato.'));
   }, [contract.id]);
@@ -1202,6 +1260,7 @@ function EditDraftContractForm({
         templateType,
         ratePlanId: templateType !== 'standard' || rateMode === 'plan' ? ratePlanId : undefined,
         dailyRate: templateType === 'standard' && rateMode === 'manual' ? dailyRate : undefined,
+        totalValueOverride: totalValueOverride || undefined,
         startDate: new Date(startDate).toISOString(),
         endDate: new Date(endDate).toISOString(),
       });
@@ -1339,6 +1398,22 @@ function EditDraftContractForm({
         <div className="field" style={{ marginBottom: 0 }}>
           <label>Data e hora de devolução prevista</label>
           <input required type="datetime-local" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+        </div>
+      </div>
+
+      <div className="field-group">
+        <div className="field-group__label">Valor total do contrato</div>
+        <div className="field" style={{ marginBottom: 0 }}>
+          <label>Valor (R$) — ajuste manual se o período não fechar num número redondo de dias/meses</label>
+          <input
+            required
+            type="number"
+            step="0.01"
+            inputMode="decimal"
+            min="0"
+            value={totalValueOverride}
+            onChange={(e) => setTotalValueOverride(e.target.value)}
+          />
         </div>
       </div>
 

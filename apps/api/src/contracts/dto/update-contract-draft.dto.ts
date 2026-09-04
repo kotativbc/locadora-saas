@@ -22,6 +22,10 @@ export class UpdateContractDraftDto {
   templateType?: 'standard' | 'monthly_app_driver' | 'protected';
 
   @IsOptional()
+  @IsNumberString()
+  totalValueOverride?: string;
+
+  @IsOptional()
   @IsDateString()
   startDate?: string;
 
