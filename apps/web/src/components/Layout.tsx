@@ -174,19 +174,12 @@ export function Layout() {
             </>
           )}
 
-          {(hasPermission('users.manage') || hasPermission('audit.view')) && user?.companyId && (
+          {hasPermission('users.manage') && user?.companyId && (
             <>
               <div className="sidebar__section-label">Administração</div>
-              {hasPermission('users.manage') && (
-                <NavLink to="/usuarios" className={linkClass}>
-                  <UserCog /> Usuários
-                </NavLink>
-              )}
-              {hasPermission('audit.view') && (
-                <NavLink to="/auditoria" className={linkClass}>
-                  <History /> Auditoria
-                </NavLink>
-              )}
+              <NavLink to="/usuarios" className={linkClass}>
+                <UserCog /> Usuários
+              </NavLink>
             </>
           )}
         </nav>

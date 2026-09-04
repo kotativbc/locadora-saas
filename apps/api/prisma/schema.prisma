@@ -218,11 +218,17 @@ model AuditLog {
   entityId   String?
   metadata   Json?
   ip         String?
+  userAgent  String? // navegador/dispositivo de quem fez a ação
+  method     String? // verbo HTTP da requisição (GET, POST, PATCH, DELETE)
+  path       String? // rota chamada, ex: /contracts/abc-123
+  success    Boolean  @default(true) // false = tentativa que falhou (login errado, acesso negado etc.)
   createdAt  DateTime @default(now())
 
   @@index([companyId])
   @@index([userId])
   @@index([action])
+  @@index([success])
+  @@index([createdAt])
   @@map("audit_logs")
 }
 

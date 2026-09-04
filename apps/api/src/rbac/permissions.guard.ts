@@ -3,12 +3,16 @@ import { Reflector } from '@nestjs/core';
 import { PERMISSIONS_KEY } from './permissions.decorator';
 import { PermissionCode } from './rbac.constants';
 import { AuthenticatedRequest } from '../auth/types';
+import { AuditLogService } from '../common/audit-log.service';
 
 @Injectable()
 export class PermissionsGuard implements CanActivate {
-  constructor(private readonly reflector: Reflector) {}
+  constructor(
+    private readonly reflector: Reflector,
+    private readonly auditLog: AuditLogService,
+  ) {}
 
-  canActivate(context: ExecutionContext): boolean {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const required = this.reflector.getAllAndOverride<PermissionCode[]>(PERMISSIONS_KEY, [
       context.getHandler(),
       context.getClass(),
@@ -26,6 +30,13 @@ export class PermissionsGuard implements CanActivate {
     // permitir "A ou B" (ex: dono da empresa OU Super Admin da plataforma).
     const hasAny = required.some((perm) => userPermissions.has(perm));
     if (!hasAny) {
+      await this.auditLog.record({
+        action: 'auth.access_denied',
+        userId: req.user?.id,
+        companyId: req.user?.companyId,
+        metadata: { requiredPermissions: required, userPermissions: Array.from(userPermissions) },
+        success: false,
+      });
       throw new ForbiddenException('Você não tem permissão para executar esta ação.');
     }
     return true;

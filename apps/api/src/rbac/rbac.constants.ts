@@ -41,7 +41,6 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     PermissionCode.CONTRACTS_MANAGE,
     PermissionCode.FINANCE_MANAGE,
     PermissionCode.REPORTS_VIEW,
-    PermissionCode.AUDIT_VIEW,
   ],
   [RoleCode.FLEET_MANAGER]: [PermissionCode.FLEET_MANAGE, PermissionCode.RATES_MANAGE],
   [RoleCode.AGENT]: [

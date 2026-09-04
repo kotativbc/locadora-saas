@@ -53,15 +53,41 @@ export class AuthService {
     // Mesma mensagem de erro tanto para e-mail inexistente quanto senha errada,
     // pra não revelar se um e-mail está cadastrado (enumeration).
     if (!user || !user.active) {
+      await this.auditLog.record({
+        action: 'auth.login_failed',
+        metadata: { email, reason: !user ? 'email_not_found' : 'user_inactive' },
+        ip,
+        success: false,
+      });
       throw new UnauthorizedException('E-mail ou senha inválidos.');
     }
 
     const passwordValid = await argon2.verify(user.passwordHash, password);
     if (!passwordValid) {
+      await this.auditLog.record({
+        action: 'auth.login_failed',
+        userId: user.id,
+        companyId: user.companyId,
+        metadata: { email, reason: 'wrong_password' },
+        ip,
+        success: false,
+      });
       throw new UnauthorizedException('E-mail ou senha inválidos.');
     }
 
-    this.assertCompanyAllowsAccess(user.company?.status);
+    try {
+      this.assertCompanyAllowsAccess(user.company?.status);
+    } catch (err) {
+      await this.auditLog.record({
+        action: 'auth.login_blocked',
+        userId: user.id,
+        companyId: user.companyId,
+        metadata: { email, reason: 'company_access_blocked', companyStatus: user.company?.status },
+        ip,
+        success: false,
+      });
+      throw err;
+    }
 
     const roles = user.roles.map((ur) => ur.role.code);
     const permissions = Array.from(
