@@ -180,7 +180,13 @@ function NewMaintenanceForm({ vehicles, onCreated }: { vehicles: Vehicle[]; onCr
       </div>
       <div className="field">
         <label>Odômetro no momento (opcional)</label>
-        <input type="number" min="0" value={odometerKm} onChange={(e) => setOdometerKm(e.target.value)} />
+        <input
+          type="text"
+          inputMode="numeric"
+          placeholder="Ex: 44468"
+          value={odometerKm}
+          onChange={(e) => setOdometerKm(e.target.value.replace(/\D/g, ''))}
+        />
       </div>
       <div className="field">
         <label>Custo (R$, opcional)</label>

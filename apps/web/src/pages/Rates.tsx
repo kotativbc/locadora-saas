@@ -229,7 +229,7 @@ function NewRatePlanForm({ vehicles, onCreated }: { vehicles: Vehicle[]; onCreat
         <div className="field-group__label">Motorista de aplicativo (opcional — só preencha se for usar esse tipo de contrato)</div>
         <div className="field">
           <label>Limite de KM mensal</label>
-          <input type="number" min="0" value={kmAllowancePerMonth} onChange={(e) => setKmAllowancePerMonth(e.target.value)} />
+          <input type="text" inputMode="numeric" value={kmAllowancePerMonth} onChange={(e) => setKmAllowancePerMonth(e.target.value.replace(/\D/g, ''))} />
         </div>
         <div className="field">
           <label>Valor do KM excedente (R$)</label>

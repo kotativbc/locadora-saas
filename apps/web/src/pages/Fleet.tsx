@@ -259,7 +259,7 @@ function NewVehicleForm({ onCreated }: { onCreated: () => void }) {
         </div>
         <div className="field" style={{ marginBottom: 0 }}>
           <label>Intervalo de manutenção (km)</label>
-          <input type="number" min="1000" value={maintenanceIntervalKm} onChange={(e) => setMaintenanceIntervalKm(e.target.value)} />
+          <input type="text" inputMode="numeric" value={maintenanceIntervalKm} onChange={(e) => setMaintenanceIntervalKm(e.target.value.replace(/\D/g, ''))} />
         </div>
       </div>
       <div className="field-group">
@@ -373,7 +373,14 @@ function EditVehicleForm({
         <div className="field-group__label">Odômetro</div>
         <div className="field" style={{ marginBottom: 0 }}>
           <label>Quilometragem atual (km)</label>
-          <input required type="number" min="0" value={odometerKm} onChange={(e) => setOdometerKm(e.target.value)} />
+          <input
+            required
+            type="text"
+            inputMode="numeric"
+            placeholder="Ex: 44468"
+            value={odometerKm}
+            onChange={(e) => setOdometerKm(e.target.value.replace(/\D/g, ''))}
+          />
         </div>
       </div>
       <div className="field-group">
@@ -392,7 +399,7 @@ function EditVehicleForm({
         </div>
         <div className="field" style={{ marginBottom: 0 }}>
           <label>Intervalo de manutenção (km)</label>
-          <input type="number" min="1000" value={maintenanceIntervalKm} onChange={(e) => setMaintenanceIntervalKm(e.target.value)} />
+          <input type="text" inputMode="numeric" value={maintenanceIntervalKm} onChange={(e) => setMaintenanceIntervalKm(e.target.value.replace(/\D/g, ''))} />
         </div>
       </div>
       <div className="field-group">

@@ -1641,7 +1641,14 @@ function InspectionForm({
       )}
       <div className="field">
         <label>Odômetro (km)</label>
-        <input required type="number" min="0" value={odometerKm} onChange={(e) => setOdometerKm(e.target.value)} />
+        <input
+          required
+          type="text"
+          inputMode="numeric"
+          placeholder="Ex: 44468"
+          value={odometerKm}
+          onChange={(e) => setOdometerKm(e.target.value.replace(/\D/g, ''))}
+        />
       </div>
       <div className="field">
         <label>Nível de combustível</label>
