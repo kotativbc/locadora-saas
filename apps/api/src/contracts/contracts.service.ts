@@ -29,6 +29,15 @@ function daysBetween(start: Date, end: Date): number {
   return Math.max(1, Math.ceil(ms / (1000 * 60 * 60 * 24)));
 }
 
+/** Se o período fecha em semana(s) exata(s) e a tarifa tem valor semanal cadastrado, usa ele — geralmente mais barato que diária × 7. Senão, cai na diária normal. */
+function calculatePeriodValue(dailyRate: string, weeklyRate: string | null | undefined, days: number): string {
+  if (weeklyRate && days % 7 === 0) {
+    const weeks = days / 7;
+    return (Number(weeklyRate) * weeks).toFixed(2);
+  }
+  return (Number(dailyRate) * days).toFixed(2);
+}
+
 @Injectable()
 export class ContractsService {
   constructor(
@@ -161,8 +170,8 @@ export class ContractsService {
       if (!ratePlan.monthlyRate) {
         throw new BadRequestException('Esta tarifa não tem valor mensal cadastrado — edite a tarifa antes de usar neste tipo de contrato.');
       }
-      totalValue = ratePlan.monthlyRate.toString();
       dailyRate = (Number(ratePlan.monthlyRate) / 30).toFixed(2);
+      totalValue = (Number(dailyRate) * days).toFixed(2); // proporcional: (dias/30) × valor mensal
       monthlyKmLimitSnapshot = ratePlan.kmAllowancePerMonth ?? undefined;
       extraKmRateSnapshot = ratePlan.extraKmRate?.toString();
       cautionAmountSnapshot = ratePlan.cautionAmount?.toString();
@@ -180,7 +189,7 @@ export class ContractsService {
         );
       }
       dailyRate = ratePlan.dailyRate.toString();
-      totalValue = (Number(dailyRate) * days).toFixed(2);
+      totalValue = calculatePeriodValue(dailyRate, ratePlan.weeklyRate?.toString(), days);
       monthlyKmLimitSnapshot = ratePlan.kmAllowancePerMonth;
       extraKmRateSnapshot = ratePlan.extraKmRate.toString();
       cautionAmountSnapshot = ratePlan.cautionAmount.toString();
@@ -190,7 +199,7 @@ export class ContractsService {
         throw new NotFoundException('Tarifa não encontrada nesta empresa.');
       }
       dailyRate = ratePlan.dailyRate.toString();
-      totalValue = (Number(dailyRate) * days).toFixed(2);
+      totalValue = calculatePeriodValue(dailyRate, ratePlan.weeklyRate?.toString(), days);
     } else if (dto.dailyRate) {
       dailyRate = dto.dailyRate;
       totalValue = (Number(dailyRate) * days).toFixed(2);

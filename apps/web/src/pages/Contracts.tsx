@@ -21,6 +21,7 @@ interface RatePlan {
   id: string;
   name: string;
   dailyRate: string;
+  weeklyRate: string | null;
   monthlyRate: string | null;
   kmAllowancePerMonth: number | null;
   extraKmRate: string | null;
@@ -59,6 +60,14 @@ const STATUS_VARIANT: Record<string, BadgeVariant> = {
 
 function formatCurrency(value: string) {
   return Number(value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+/** Espelha calculatePeriodValue do backend — pra sugestão bater com o que vai ser salvo de verdade. */
+function estimatePeriodValue(dailyRate: string | number, weeklyRate: string | null | undefined, days: number): string {
+  if (weeklyRate && days % 7 === 0) {
+    return (Number(weeklyRate) * (days / 7)).toFixed(2);
+  }
+  return (Number(dailyRate) * days).toFixed(2);
 }
 
 export function Contracts() {
@@ -495,17 +504,18 @@ function NewContractForm({
   useEffect(() => {
     if (valueTouched) return;
     let suggestion = '';
-    if (templateType === 'monthly_app_driver' && selectedMonthlyPlan?.monthlyRate) {
-      suggestion = Number(selectedMonthlyPlan.monthlyRate).toFixed(2);
-    } else if (startDate && endDate) {
+    if (startDate && endDate) {
       const days = Math.max(1, Math.ceil((new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24)));
-      const rate =
-        templateType === 'protected'
-          ? selectedProtectedPlan?.dailyRate
-          : rateMode === 'plan'
-            ? selectedManualPlan?.dailyRate
-            : dailyRate;
-      if (rate) suggestion = (Number(rate) * days).toFixed(2);
+      if (templateType === 'monthly_app_driver' && selectedMonthlyPlan?.monthlyRate) {
+        const dailyFromMonthly = Number(selectedMonthlyPlan.monthlyRate) / 30;
+        suggestion = (dailyFromMonthly * days).toFixed(2); // proporcional: (dias/30) × mensal
+      } else if (templateType === 'protected' && selectedProtectedPlan) {
+        suggestion = estimatePeriodValue(selectedProtectedPlan.dailyRate, selectedProtectedPlan.weeklyRate, days);
+      } else if (rateMode === 'plan' && selectedManualPlan) {
+        suggestion = estimatePeriodValue(selectedManualPlan.dailyRate, selectedManualPlan.weeklyRate, days);
+      } else if (dailyRate) {
+        suggestion = (Number(dailyRate) * days).toFixed(2);
+      }
     }
     setTotalValueOverride(suggestion);
     // eslint-disable-next-line react-hooks/exhaustive-deps
