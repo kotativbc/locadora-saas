@@ -52,6 +52,19 @@ export function Rates() {
     load();
   }, []);
 
+  async function handleDelete(plan: RatePlan) {
+    if (!window.confirm(`Excluir a tarifa "${plan.name}"? Contratos já criados com ela continuam com os valores intactos — só deixa de existir pra novos contratos.`)) {
+      return;
+    }
+    setError(null);
+    try {
+      await api.delete(`/rate-plans/${plan.id}`);
+      load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erro ao excluir a tarifa.');
+    }
+  }
+
   return (
     <div>
       <div className="page-header">
@@ -83,6 +96,7 @@ export function Rates() {
                 <th>Semanal</th>
                 <th>Mensal</th>
                 <th>Status</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -100,6 +114,15 @@ export function Rates() {
                   <td>{r.weeklyRate ? formatCurrency(r.weeklyRate) : '—'}</td>
                   <td>{r.monthlyRate ? formatCurrency(r.monthlyRate) : '—'}</td>
                   <td>{r.active ? 'Ativa' : 'Inativa'}</td>
+                  <td>
+                    <button
+                      className="logout-btn"
+                      style={{ color: 'var(--rtv-danger)', borderColor: 'var(--border)' }}
+                      onClick={() => handleDelete(r)}
+                    >
+                      Excluir
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>

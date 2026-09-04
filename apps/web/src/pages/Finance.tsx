@@ -88,6 +88,23 @@ export function Finance() {
     }
   }
 
+  async function handleDelete(charge: Charge) {
+    const statusWarning =
+      charge.status === 'paid'
+        ? ' ATENÇÃO: este já está marcado como PAGO — excluir remove o registro de um valor que realmente entrou.'
+        : '';
+    if (!window.confirm(`Excluir o lançamento "${charge.description}" (${formatCurrency(charge.amount)})?${statusWarning}`)) {
+      return;
+    }
+    setError(null);
+    try {
+      await api.delete(`/charges/${charge.id}`);
+      load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erro ao excluir o lançamento.');
+    }
+  }
+
   return (
     <div>
       <div className="page-header">
@@ -123,6 +140,7 @@ export function Finance() {
                 <th>Valor</th>
                 <th>Vencimento</th>
                 <th>Status</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -140,6 +158,15 @@ export function Finance() {
                       disabled={savingId === c.id}
                       onChange={(status) => handleStatusChange(c.id, status)}
                     />
+                  </td>
+                  <td>
+                    <button
+                      className="logout-btn"
+                      style={{ color: 'var(--rtv-danger)', borderColor: 'var(--border)' }}
+                      onClick={() => handleDelete(c)}
+                    >
+                      Excluir
+                    </button>
                   </td>
                 </tr>
               ))}

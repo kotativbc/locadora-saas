@@ -59,6 +59,10 @@ export class UpdateVehicleDto {
   acquisitionCost?: string;
 
   @IsOptional()
+  @IsNumberString()
+  priorEarnings?: string;
+
+  @IsOptional()
   @IsInt()
   @Min(1000)
   maintenanceIntervalKm?: number;

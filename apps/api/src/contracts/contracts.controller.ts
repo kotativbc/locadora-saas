@@ -2,6 +2,8 @@ import { Body, Controller, Delete, Get, Param, Patch, Post, Res } from '@nestjs/
 import { Response } from 'express';
 import { ContractsService } from './contracts.service';
 import { CreateContractDto } from './dto/create-contract.dto';
+import { UpdateContractDraftDto } from './dto/update-contract-draft.dto';
+import { UpdateContractOperationalDto } from './dto/update-contract-operational.dto';
 import { CreateCautionInstallmentDto } from './dto/create-caution-installment.dto';
 import { UpdateCautionInstallmentDto } from './dto/update-caution-installment.dto';
 import { CreateRentInstallmentDto } from './dto/create-rent-installment.dto';
@@ -20,6 +22,30 @@ export class ContractsController {
   @Post()
   create(@Body() dto: CreateContractDto, @CurrentUser() actor: RequestUser) {
     return this.contractsService.create(dto, actor);
+  }
+
+  @Patch(':id/draft')
+  updateDraft(@Param('id') id: string, @Body() dto: UpdateContractDraftDto, @CurrentUser() actor: RequestUser) {
+    return this.contractsService.updateDraft(id, dto, actor);
+  }
+
+  @Patch(':id/operational')
+  updateOperational(
+    @Param('id') id: string,
+    @Body() dto: UpdateContractOperationalDto,
+    @CurrentUser() actor: RequestUser,
+  ) {
+    return this.contractsService.updateOperational(id, dto, actor);
+  }
+
+  @Post(':id/cancel')
+  cancel(@Param('id') id: string, @CurrentUser() actor: RequestUser) {
+    return this.contractsService.cancel(id, actor);
+  }
+
+  @Delete(':id')
+  remove(@Param('id') id: string, @CurrentUser() actor: RequestUser) {
+    return this.contractsService.remove(id, actor);
   }
 
   @Get()

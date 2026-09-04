@@ -13,6 +13,8 @@ import { ContractPdfService } from './pdf/contract-pdf.service';
 import { ChargeGeneratorService } from '../finance/charge-generator.service';
 import { EMAIL_ADAPTER, EmailAdapter } from '../email/email-adapter.interface';
 import { CreateContractDto } from './dto/create-contract.dto';
+import { UpdateContractDraftDto } from './dto/update-contract-draft.dto';
+import { UpdateContractOperationalDto } from './dto/update-contract-operational.dto';
 import { CreateCautionInstallmentDto } from './dto/create-caution-installment.dto';
 import { UpdateCautionInstallmentDto } from './dto/update-caution-installment.dto';
 import { CreateRentInstallmentDto } from './dto/create-rent-installment.dto';
@@ -90,9 +92,59 @@ export class ContractsService {
     const templateType = dto.templateType ?? 'standard';
     const days = daysBetween(startDate, endDate);
 
+    ({ dailyRate, totalValue, monthlyKmLimitSnapshot, extraKmRateSnapshot, cautionAmountSnapshot } =
+      await this.computeContractFinancials(dto, templateType, days, actor));
+
+    const contract = await this.prisma.contract.create({
+      data: {
+        companyId: actor.companyId,
+        customerId: dto.customerId,
+        vehicleId: dto.vehicleId,
+        ratePlanId: dto.ratePlanId,
+        templateType,
+        startDate,
+        endDate,
+        dailyRateSnapshot: dailyRate,
+        totalValue,
+        monthlyKmLimitSnapshot,
+        extraKmRateSnapshot,
+        cautionAmountSnapshot,
+        status: 'draft',
+        createdByUserId: actor.id,
+      },
+    });
+
+    await this.auditLog.record({
+      action: 'contract.create',
+      userId: actor.id,
+      companyId: actor.companyId,
+      entityType: 'Contract',
+      entityId: contract.id,
+    });
+
+    return contract;
+  }
+
+  /** Extraído de create() pra ser reaproveitado na edição completa (só permitida antes da assinatura). */
+  private async computeContractFinancials(
+    dto: { ratePlanId?: string; dailyRate?: string },
+    templateType: string,
+    days: number,
+    actor: RequestUser,
+  ): Promise<{
+    dailyRate: string;
+    totalValue: string;
+    monthlyKmLimitSnapshot: number | undefined;
+    extraKmRateSnapshot: string | undefined;
+    cautionAmountSnapshot: string | undefined;
+  }> {
+    let dailyRate: string;
+    let totalValue: string;
+    let monthlyKmLimitSnapshot: number | undefined;
+    let extraKmRateSnapshot: string | undefined;
+    let cautionAmountSnapshot: string | undefined;
+
     if (templateType === 'monthly_app_driver') {
-      // Modalidade mensal sempre usa tarifa cadastrada — precisa dos campos
-      // de KM/caução, que não existem numa diária avulsa.
       if (!dto.ratePlanId) {
         throw new BadRequestException('Contrato de motorista de aplicativo exige uma tarifa cadastrada com valor mensal.');
       }
@@ -104,14 +156,11 @@ export class ContractsService {
         throw new BadRequestException('Esta tarifa não tem valor mensal cadastrado — edite a tarifa antes de usar neste tipo de contrato.');
       }
       totalValue = ratePlan.monthlyRate.toString();
-      dailyRate = (Number(ratePlan.monthlyRate) / 30).toFixed(2); // equivalente só pra manter o campo preenchido
+      dailyRate = (Number(ratePlan.monthlyRate) / 30).toFixed(2);
       monthlyKmLimitSnapshot = ratePlan.kmAllowancePerMonth ?? undefined;
       extraKmRateSnapshot = ratePlan.extraKmRate?.toString();
       cautionAmountSnapshot = ratePlan.cautionAmount?.toString();
     } else if (templateType === 'protected') {
-      // "Padrão com proteção total" — diária normal (qualquer duração), mas
-      // exige tarifa com caução, limite de KM e KM excedente cadastrados,
-      // já que essas cláusulas são o motivo de escolher esse modelo.
       if (!dto.ratePlanId) {
         throw new BadRequestException('Contrato com proteção total exige uma tarifa cadastrada com caução e limite de KM.');
       }
@@ -143,12 +192,68 @@ export class ContractsService {
       throw new BadRequestException('Informe uma tarifa cadastrada ou uma diária avulsa.');
     }
 
-    const contract = await this.prisma.contract.create({
+    return { dailyRate, totalValue, monthlyKmLimitSnapshot, extraKmRateSnapshot, cautionAmountSnapshot };
+  }
+
+  /** Edição completa — só permitida antes da assinatura (rascunho ou aguardando assinatura). */
+  async updateDraft(id: string, dto: UpdateContractDraftDto, actor: RequestUser) {
+    const contract = await this.findAndAssertSameCompany(id, actor);
+    if (contract.status !== 'draft' && contract.status !== 'awaiting_signature') {
+      throw new BadRequestException(
+        'Este contrato já foi assinado — os termos centrais não podem mais ser alterados. Use a edição operacional (data de devolução/observações), ou cancele e crie um novo se precisar mudar algo maior.',
+      );
+    }
+
+    const customerId = dto.customerId ?? contract.customerId;
+    const vehicleId = dto.vehicleId ?? contract.vehicleId;
+    const startDate = dto.startDate ? new Date(dto.startDate) : contract.startDate;
+    const endDate = dto.endDate ? new Date(dto.endDate) : contract.endDate;
+    const templateType = dto.templateType ?? contract.templateType;
+
+    if (endDate <= startDate) {
+      throw new BadRequestException('A data de devolução deve ser depois da data de início.');
+    }
+
+    if (dto.customerId) {
+      const customer = await this.prisma.customer.findUnique({ where: { id: dto.customerId } });
+      if (!customer || customer.companyId !== actor.companyId) {
+        throw new NotFoundException('Cliente não encontrado nesta empresa.');
+      }
+    }
+    if (dto.vehicleId) {
+      const vehicle = await this.prisma.vehicle.findUnique({ where: { id: dto.vehicleId } });
+      if (!vehicle || vehicle.companyId !== actor.companyId) {
+        throw new NotFoundException('Veículo não encontrado nesta empresa.');
+      }
+    }
+
+    // Conflito de agenda, ignorando o próprio contrato sendo editado.
+    const overlapping = await this.prisma.contract.findFirst({
+      where: {
+        id: { not: id },
+        vehicleId,
+        status: { in: ['draft', 'awaiting_signature', 'active'] },
+        startDate: { lt: endDate },
+        endDate: { gt: startDate },
+      },
+    });
+    if (overlapping) {
+      throw new ConflictException(
+        `Este veículo já tem outro contrato de ${overlapping.startDate.toLocaleDateString('pt-BR')} a ${overlapping.endDate.toLocaleDateString('pt-BR')}.`,
+      );
+    }
+
+    const days = daysBetween(startDate, endDate);
+    const ratePlanId = dto.ratePlanId ?? contract.ratePlanId ?? undefined;
+    const { dailyRate, totalValue, monthlyKmLimitSnapshot, extraKmRateSnapshot, cautionAmountSnapshot } =
+      await this.computeContractFinancials({ ratePlanId, dailyRate: dto.dailyRate }, templateType, days, actor);
+
+    const updated = await this.prisma.contract.update({
+      where: { id },
       data: {
-        companyId: actor.companyId,
-        customerId: dto.customerId,
-        vehicleId: dto.vehicleId,
-        ratePlanId: dto.ratePlanId,
+        customerId,
+        vehicleId,
+        ratePlanId,
         templateType,
         startDate,
         endDate,
@@ -157,20 +262,104 @@ export class ContractsService {
         monthlyKmLimitSnapshot,
         extraKmRateSnapshot,
         cautionAmountSnapshot,
-        status: 'draft',
-        createdByUserId: actor.id,
       },
     });
 
     await this.auditLog.record({
-      action: 'contract.create',
+      action: 'contract.update_draft',
       userId: actor.id,
       companyId: actor.companyId,
       entityType: 'Contract',
-      entityId: contract.id,
+      entityId: id,
+      metadata: dto as unknown as Record<string, unknown>,
     });
 
-    return contract;
+    return updated;
+  }
+
+  /** Edição operacional — pra contratos já assinados. Só data de devolução e observações; nunca os termos centrais. */
+  async updateOperational(id: string, dto: UpdateContractOperationalDto, actor: RequestUser) {
+    const contract = await this.findAndAssertSameCompany(id, actor);
+    if (contract.status === 'draft' || contract.status === 'awaiting_signature') {
+      throw new BadRequestException('Este contrato ainda não foi assinado — use a edição completa em vez desta.');
+    }
+    if (contract.status === 'cancelled') {
+      throw new BadRequestException('Este contrato está cancelado e não pode mais ser editado.');
+    }
+
+    const data: { endDate?: Date; notes?: string } = {};
+    if (dto.endDate) {
+      const endDate = new Date(dto.endDate);
+      if (endDate <= contract.startDate) {
+        throw new BadRequestException('A data de devolução deve ser depois da data de início.');
+      }
+      data.endDate = endDate;
+    }
+    if (dto.notes !== undefined) {
+      data.notes = dto.notes;
+    }
+
+    const updated = await this.prisma.contract.update({ where: { id }, data });
+
+    await this.auditLog.record({
+      action: 'contract.update_operational',
+      userId: actor.id,
+      companyId: actor.companyId,
+      entityType: 'Contract',
+      entityId: id,
+      metadata: dto as unknown as Record<string, unknown>,
+    });
+
+    return updated;
+  }
+
+  /** Cancela o contrato — some das listas ativas, mas todo o histórico (lançamentos, vistorias, etc.) é preservado. Reversível manualmente se necessário. */
+  async cancel(id: string, actor: RequestUser) {
+    const contract = await this.findAndAssertSameCompany(id, actor);
+    if (contract.status === 'cancelled') {
+      throw new BadRequestException('Este contrato já está cancelado.');
+    }
+
+    const updated = await this.prisma.contract.update({ where: { id }, data: { status: 'cancelled' } });
+
+    await this.auditLog.record({
+      action: 'contract.cancel',
+      userId: actor.id,
+      companyId: actor.companyId,
+      entityType: 'Contract',
+      entityId: id,
+    });
+
+    return updated;
+  }
+
+  /**
+   * Exclusão definitiva — só permitida se o contrato NUNCA foi assinado (rascunho
+   * ou aguardando assinatura). Contratos assinados têm força jurídica e histórico
+   * financeiro real; pra esses, use cancel() em vez de remove(). O banco já cuida
+   * de apagar em cascata o que só faz sentido junto do contrato (parcelas,
+   * vistorias, sinalizações) e de desvincular sem apagar o que é um registro real
+   * por si só (multas, avarias, sinistros, lançamentos já gerados).
+   */
+  async remove(id: string, actor: RequestUser) {
+    const contract = await this.findAndAssertSameCompany(id, actor);
+    if (contract.status !== 'draft' && contract.status !== 'awaiting_signature') {
+      throw new BadRequestException(
+        'Este contrato já foi assinado — não pode ser excluído definitivamente (tem força jurídica e possivelmente histórico financeiro real). Use "cancelar" em vez disso.',
+      );
+    }
+
+    await this.prisma.contract.delete({ where: { id } });
+
+    await this.auditLog.record({
+      action: 'contract.delete',
+      userId: actor.id,
+      companyId: actor.companyId,
+      entityType: 'Contract',
+      entityId: id,
+    });
+
+    return { deleted: true };
   }
 
   async findAll(actor: RequestUser) {

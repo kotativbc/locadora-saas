@@ -94,4 +94,29 @@ export class ChargesService {
 
     return updated;
   }
+
+  async remove(id: string, actor: RequestUser) {
+    const charge = await this.prisma.charge.findUnique({ where: { id } });
+    if (!charge) {
+      throw new NotFoundException('Lançamento não encontrado.');
+    }
+    if (!actor.companyId || charge.companyId !== actor.companyId) {
+      throw new ForbiddenException('Você não tem acesso a este lançamento.');
+    }
+
+    await this.prisma.charge.delete({ where: { id } });
+
+    // Registra status/valor no log — sobretudo importante se era um lançamento
+    // já pago (dinheiro que realmente entrou), pra manter rastro de quem excluiu o quê.
+    await this.auditLog.record({
+      action: 'charge.delete',
+      userId: actor.id,
+      companyId: actor.companyId,
+      entityType: 'Charge',
+      entityId: id,
+      metadata: { status: charge.status, amount: charge.amount.toString(), description: charge.description },
+    });
+
+    return { deleted: true };
+  }
 }

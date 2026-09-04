@@ -79,6 +79,8 @@ export function Contracts() {
   const [reportsTarget, setReportsTarget] = useState<Contract | null>(null);
   const [sendingInvoiceId, setSendingInvoiceId] = useState<string | null>(null);
   const [invoiceSentMessage, setInvoiceSentMessage] = useState<string | null>(null);
+  const [editDraftTarget, setEditDraftTarget] = useState<Contract | null>(null);
+  const [editOperationalTarget, setEditOperationalTarget] = useState<Contract | null>(null);
 
   async function load() {
     setLoading(true);
@@ -157,6 +159,36 @@ export function Contracts() {
       setError(err instanceof ApiError ? err.message : 'Erro ao enviar a fatura por e-mail.');
     } finally {
       setSendingInvoiceId(null);
+    }
+  }
+
+  async function handleCancelContract(contract: Contract) {
+    if (!window.confirm(`Cancelar o contrato de ${contract.customer.name}? O histórico fica guardado, mas ele sai das listas ativas.`)) {
+      return;
+    }
+    setError(null);
+    try {
+      await api.post(`/contracts/${contract.id}/cancel`);
+      load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erro ao cancelar o contrato.');
+    }
+  }
+
+  async function handleDeleteContract(contract: Contract) {
+    if (
+      !window.confirm(
+        `Excluir DEFINITIVAMENTE o contrato de ${contract.customer.name}? Isso não pode ser desfeito. Só é permitido porque ele nunca foi assinado.`,
+      )
+    ) {
+      return;
+    }
+    setError(null);
+    try {
+      await api.delete(`/contracts/${contract.id}`);
+      load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erro ao excluir o contrato.');
     }
   }
 
@@ -326,6 +358,42 @@ export function Contracts() {
                         Sinalizações
                       </button>
                     )}
+                    {(c.status === 'draft' || c.status === 'awaiting_signature') && (
+                      <button
+                        className="logout-btn"
+                        style={{ color: 'var(--primary)', borderColor: 'var(--border)' }}
+                        onClick={() => setEditDraftTarget(c)}
+                      >
+                        Editar
+                      </button>
+                    )}
+                    {(c.status === 'active' || c.status === 'completed') && (
+                      <button
+                        className="logout-btn"
+                        style={{ color: 'var(--primary)', borderColor: 'var(--border)' }}
+                        onClick={() => setEditOperationalTarget(c)}
+                      >
+                        Editar
+                      </button>
+                    )}
+                    {c.status !== 'cancelled' && (
+                      <button
+                        className="logout-btn"
+                        style={{ color: 'var(--rtv-warning)', borderColor: 'var(--border)' }}
+                        onClick={() => handleCancelContract(c)}
+                      >
+                        Cancelar
+                      </button>
+                    )}
+                    {(c.status === 'draft' || c.status === 'awaiting_signature') && (
+                      <button
+                        className="logout-btn"
+                        style={{ color: 'var(--rtv-danger)', borderColor: 'var(--border)' }}
+                        onClick={() => handleDeleteContract(c)}
+                      >
+                        Excluir
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -333,6 +401,25 @@ export function Contracts() {
           </table>
         )}
       </div>
+
+      {editDraftTarget && (
+        <EditDraftContractForm
+          contract={editDraftTarget}
+          customers={customers}
+          vehicles={vehicles}
+          ratePlans={ratePlans}
+          onSaved={() => { setEditDraftTarget(null); load(); }}
+          onCancel={() => setEditDraftTarget(null)}
+        />
+      )}
+
+      {editOperationalTarget && (
+        <EditOperationalContractForm
+          contract={editOperationalTarget}
+          onSaved={() => { setEditOperationalTarget(null); load(); }}
+          onCancel={() => setEditOperationalTarget(null)}
+        />
+      )}
 
       {inspectionTarget && (
         <InspectionForm
@@ -1041,6 +1128,317 @@ function CautionInstallmentsPanel({ contract, onClose }: { contract: Contract; o
         </>
       )}
     </div>
+  );
+}
+
+interface FullContract {
+  id: string;
+  customerId: string;
+  vehicleId: string;
+  ratePlanId: string | null;
+  templateType: string;
+  startDate: string;
+  endDate: string;
+  dailyRateSnapshot: string;
+  notes: string | null;
+}
+
+function EditDraftContractForm({
+  contract,
+  customers,
+  vehicles,
+  ratePlans,
+  onSaved,
+  onCancel,
+}: {
+  contract: Contract;
+  customers: Customer[];
+  vehicles: Vehicle[];
+  ratePlans: RatePlan[];
+  onSaved: () => void;
+  onCancel: () => void;
+}) {
+  const [full, setFull] = useState<FullContract | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [customerId, setCustomerId] = useState('');
+  const [vehicleId, setVehicleId] = useState('');
+  const [templateType, setTemplateType] = useState<'standard' | 'monthly_app_driver' | 'protected'>('standard');
+  const [rateMode, setRateMode] = useState<'plan' | 'manual'>('plan');
+  const [ratePlanId, setRatePlanId] = useState('');
+  const [dailyRate, setDailyRate] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const monthlyPlans = ratePlans.filter((r) => r.monthlyRate);
+  const protectedPlans = ratePlans.filter((r) => r.cautionAmount && r.kmAllowancePerMonth && r.extraKmRate);
+
+  useEffect(() => {
+    api
+      .get<FullContract>(`/contracts/${contract.id}`)
+      .then((c) => {
+        setFull(c);
+        setCustomerId(c.customerId);
+        setVehicleId(c.vehicleId);
+        setTemplateType(c.templateType as 'standard' | 'monthly_app_driver' | 'protected');
+        setRatePlanId(c.ratePlanId ?? '');
+        setRateMode(c.ratePlanId ? 'plan' : 'manual');
+        setDailyRate(c.dailyRateSnapshot);
+        setStartDate(c.startDate.slice(0, 16));
+        setEndDate(c.endDate.slice(0, 16));
+      })
+      .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Erro ao carregar contrato.'));
+  }, [contract.id]);
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    try {
+      await api.patch(`/contracts/${contract.id}/draft`, {
+        customerId,
+        vehicleId,
+        templateType,
+        ratePlanId: templateType !== 'standard' || rateMode === 'plan' ? ratePlanId : undefined,
+        dailyRate: templateType === 'standard' && rateMode === 'manual' ? dailyRate : undefined,
+        startDate: new Date(startDate).toISOString(),
+        endDate: new Date(endDate).toISOString(),
+      });
+      onSaved();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erro ao salvar o contrato.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (loadError) {
+    return (
+      <div className="card">
+        <div className="error-banner">{loadError}</div>
+      </div>
+    );
+  }
+  if (!full) {
+    return (
+      <div className="card">
+        <p style={{ margin: 0 }}>Carregando...</p>
+      </div>
+    );
+  }
+
+  return (
+    <form className="card" onSubmit={handleSubmit} style={{ borderColor: 'var(--rtv-amber-500)' }}>
+      <h3 style={{ marginTop: 0 }}>Editar contrato (ainda não assinado) — {contract.customer.name}</h3>
+      <p style={{ fontSize: 12, color: 'var(--ink-muted)', marginTop: -8 }}>
+        Como este contrato ainda não foi assinado, dá pra mudar qualquer coisa aqui. Depois de assinado, isso deixa
+        de ser possível — só data de devolução e observações continuam editáveis.
+      </p>
+      {error && <div className="error-banner">{error}</div>}
+
+      <div className="field-group">
+        <div className="field-group__label">Tipo de contrato</div>
+        <div className="field" style={{ marginBottom: 0 }}>
+          <select value={templateType} onChange={(e) => setTemplateType(e.target.value as typeof templateType)}>
+            <option value="standard">Padrão (diária/semanal/mensal)</option>
+            <option value="protected">Padrão com Proteção Total (caução, KM controlado, telemetria)</option>
+            <option value="monthly_app_driver">Motorista de aplicativo (mensal, com caução e KM controlado)</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="field-group">
+        <div className="field-group__label">Cliente e veículo</div>
+        <div className="field">
+          <label>Cliente</label>
+          <select value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
+            {customers.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name} — {c.document}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="field" style={{ marginBottom: 0 }}>
+          <label>Veículo</label>
+          <select value={vehicleId} onChange={(e) => setVehicleId(e.target.value)}>
+            {vehicles.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.plate} — {v.brand} {v.model}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {templateType === 'monthly_app_driver' ? (
+        <div className="field-group">
+          <div className="field-group__label">Tarifa (motorista de aplicativo)</div>
+          <div className="field" style={{ marginBottom: 0 }}>
+            <label>Plano de tarifa</label>
+            <select value={ratePlanId} onChange={(e) => setRatePlanId(e.target.value)}>
+              {monthlyPlans.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name} — {formatCurrency(r.monthlyRate!)}/mês
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      ) : templateType === 'protected' ? (
+        <div className="field-group">
+          <div className="field-group__label">Tarifa (com proteção total)</div>
+          <div className="field" style={{ marginBottom: 0 }}>
+            <label>Plano de tarifa</label>
+            <select value={ratePlanId} onChange={(e) => setRatePlanId(e.target.value)}>
+              {protectedPlans.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name} — {formatCurrency(r.dailyRate)}/dia
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      ) : (
+        <div className="field-group">
+          <div className="field-group__label">Tarifa</div>
+          <div className="field">
+            <label>Como cobrar</label>
+            <select value={rateMode} onChange={(e) => setRateMode(e.target.value as 'plan' | 'manual')}>
+              {ratePlans.length > 0 && <option value="plan">Usar tarifa cadastrada</option>}
+              <option value="manual">Diária avulsa</option>
+            </select>
+          </div>
+          {rateMode === 'plan' ? (
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>Plano de tarifa</label>
+              <select value={ratePlanId} onChange={(e) => setRatePlanId(e.target.value)}>
+                {ratePlans.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name} — {formatCurrency(r.dailyRate)}/dia
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>Diária (R$)</label>
+              <input required type="number" step="0.01" inputMode="decimal" min="0" value={dailyRate} onChange={(e) => setDailyRate(e.target.value)} />
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="field-group">
+        <div className="field-group__label">Período</div>
+        <div className="field">
+          <label>Data e hora de retirada</label>
+          <input required type="datetime-local" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+        </div>
+        <div className="field" style={{ marginBottom: 0 }}>
+          <label>Data e hora de devolução prevista</label>
+          <input required type="datetime-local" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button className="btn" type="submit" disabled={submitting}>
+          {submitting ? 'Salvando...' : 'Salvar alterações'}
+        </button>
+        <button type="button" className="logout-btn" style={{ color: 'var(--ink-muted)', borderColor: 'var(--border)' }} onClick={onCancel}>
+          Cancelar
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function EditOperationalContractForm({
+  contract,
+  onSaved,
+  onCancel,
+}: {
+  contract: Contract;
+  onSaved: () => void;
+  onCancel: () => void;
+}) {
+  const [full, setFull] = useState<FullContract | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [endDate, setEndDate] = useState('');
+  const [notes, setNotes] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    api
+      .get<FullContract>(`/contracts/${contract.id}`)
+      .then((c) => {
+        setFull(c);
+        setEndDate(c.endDate.slice(0, 16));
+        setNotes(c.notes ?? '');
+      })
+      .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Erro ao carregar contrato.'));
+  }, [contract.id]);
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    try {
+      await api.patch(`/contracts/${contract.id}/operational`, {
+        endDate: new Date(endDate).toISOString(),
+        notes: notes || undefined,
+      });
+      onSaved();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erro ao salvar o contrato.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (loadError) {
+    return (
+      <div className="card">
+        <div className="error-banner">{loadError}</div>
+      </div>
+    );
+  }
+  if (!full) {
+    return (
+      <div className="card">
+        <p style={{ margin: 0 }}>Carregando...</p>
+      </div>
+    );
+  }
+
+  return (
+    <form className="card" onSubmit={handleSubmit}>
+      <h3 style={{ marginTop: 0 }}>Editar contrato assinado — {contract.customer.name}</h3>
+      <p style={{ fontSize: 12, color: 'var(--ink-muted)', marginTop: -8 }}>
+        Este contrato já foi assinado, então só dá pra ajustar informações operacionais — não os termos que o
+        cliente aceitou (cliente, veículo, valores). Se precisar mudar algo maior, cancele este contrato e crie um
+        novo.
+      </p>
+      {error && <div className="error-banner">{error}</div>}
+      <div className="field">
+        <label>Data e hora de devolução prevista</label>
+        <input required type="datetime-local" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+      </div>
+      <div className="field" style={{ marginBottom: 0 }}>
+        <label>Observações (opcional)</label>
+        <textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
+      </div>
+      <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+        <button className="btn" type="submit" disabled={submitting}>
+          {submitting ? 'Salvando...' : 'Salvar alterações'}
+        </button>
+        <button type="button" className="logout-btn" style={{ color: 'var(--ink-muted)', borderColor: 'var(--border)' }} onClick={onCancel}>
+          Cancelar
+        </button>
+      </div>
+    </form>
   );
 }
 

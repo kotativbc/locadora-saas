@@ -92,7 +92,9 @@ export class VehiclesService {
       }),
     ]);
 
-    const totalReceived = Number(paidCharges._sum.amount ?? 0);
+    const totalReceivedFromCharges = Number(paidCharges._sum.amount ?? 0);
+    const priorEarnings = vehicle.priorEarnings ? Number(vehicle.priorEarnings) : 0;
+    const totalReceived = totalReceivedFromCharges + priorEarnings; // ganho retroativo entra direto como recebido
     const totalPending = Number(pendingCharges._sum.amount ?? 0);
     const totalExpenses = Number(expenses._sum.amount ?? 0);
     const acquisitionCost = vehicle.acquisitionCost ? Number(vehicle.acquisitionCost) : null;
@@ -100,6 +102,7 @@ export class VehiclesService {
 
     return {
       acquisitionCost: vehicle.acquisitionCost?.toString() ?? null,
+      priorEarnings: vehicle.priorEarnings?.toString() ?? null,
       totalReceived: totalReceived.toFixed(2),
       totalPending: totalPending.toFixed(2),
       totalExpenses: totalExpenses.toFixed(2),

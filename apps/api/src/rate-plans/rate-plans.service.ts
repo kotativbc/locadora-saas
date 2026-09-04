@@ -69,4 +69,30 @@ export class RatePlansService {
 
     return updated;
   }
+
+  async remove(id: string, actor: RequestUser) {
+    const ratePlan = await this.prisma.ratePlan.findUnique({ where: { id } });
+    if (!ratePlan) {
+      throw new NotFoundException('Tarifa não encontrada.');
+    }
+    if (!actor.companyId || ratePlan.companyId !== actor.companyId) {
+      throw new ForbiddenException('Você não tem acesso a esta tarifa.');
+    }
+
+    // Seguro: contratos já feitos guardam o valor da tarifa "congelado" no
+    // momento da criação (dailyRateSnapshot etc.) — excluir a tarifa só
+    // desvincula (ratePlanId vira null), nunca muda o valor de um contrato
+    // já existente.
+    await this.prisma.ratePlan.delete({ where: { id } });
+
+    await this.auditLog.record({
+      action: 'rate_plan.delete',
+      userId: actor.id,
+      companyId: actor.companyId,
+      entityType: 'RatePlan',
+      entityId: id,
+    });
+
+    return { deleted: true };
+  }
 }

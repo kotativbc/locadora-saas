@@ -261,6 +261,7 @@ model Vehicle {
   fuelType        String? // flex, gasolina, diesel, eletrico, hibrido
   fipeValue       Decimal? @db.Decimal(10, 2) // base pra multas indenizatórias calculadas em % da FIPE
   acquisitionCost Decimal? @db.Decimal(10, 2) // quanto o veículo custou pra empresa — diferente da FIPE (valor de mercado), usado pra ver retorno real
+  priorEarnings   Decimal? @db.Decimal(10, 2) // ganho retroativo — quanto o veículo já rendeu ANTES de começar a ser controlado no sistema (lançamento manual único, não vira Charge/Lançamento)
   maintenanceIntervalKm Int? // a cada quantos km pede revisão preventiva (padrão sugerido: 10000)
   notes           String?
   createdAt       DateTime @default(now())
@@ -408,6 +409,7 @@ model Contract {
   deliveredAt       DateTime? // preenchido ao registrar a vistoria de entrega
   returnedAt        DateTime? // preenchido ao registrar a vistoria de devolução
   maintenanceReportToken String? @unique // link público pro cliente sinalizar problema, sem precisar logar
+  notes             String? // observações operacionais — editável mesmo depois de assinado, ao contrário dos termos centrais
   createdByUserId   String?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt

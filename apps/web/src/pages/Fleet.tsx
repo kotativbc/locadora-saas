@@ -18,6 +18,7 @@ interface Vehicle {
   renavam: string | null;
   fipeValue: string | null;
   acquisitionCost: string | null;
+  priorEarnings: string | null;
   maintenanceIntervalKm: number | null;
   createdAt: string;
 }
@@ -174,6 +175,7 @@ function NewVehicleForm({ onCreated }: { onCreated: () => void }) {
   const [renavam, setRenavam] = useState('');
   const [fipeValue, setFipeValue] = useState('');
   const [acquisitionCost, setAcquisitionCost] = useState('');
+  const [priorEarnings, setPriorEarnings] = useState('');
   const [maintenanceIntervalKm, setMaintenanceIntervalKm] = useState('10000');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -194,6 +196,7 @@ function NewVehicleForm({ onCreated }: { onCreated: () => void }) {
         renavam: renavam || undefined,
         fipeValue: fipeValue || undefined,
         acquisitionCost: acquisitionCost || undefined,
+        priorEarnings: priorEarnings || undefined,
         maintenanceIntervalKm: maintenanceIntervalKm ? Number(maintenanceIntervalKm) : undefined,
       });
       onCreated();
@@ -261,9 +264,13 @@ function NewVehicleForm({ onCreated }: { onCreated: () => void }) {
       </div>
       <div className="field-group">
         <div className="field-group__label">Financeiro (opcional)</div>
-        <div className="field" style={{ marginBottom: 0 }}>
+        <div className="field">
           <label>Quanto custou pra você (R$)</label>
           <input type="number" step="0.01" inputMode="decimal" min="0" value={acquisitionCost} onChange={(e) => setAcquisitionCost(e.target.value)} placeholder="Diferente da Tabela FIPE — é o que você pagou de verdade" />
+        </div>
+        <div className="field" style={{ marginBottom: 0 }}>
+          <label>Ganho retroativo (R$)</label>
+          <input type="number" step="0.01" inputMode="decimal" min="0" value={priorEarnings} onChange={(e) => setPriorEarnings(e.target.value)} placeholder="Quanto esse veículo já rendeu antes de entrar no sistema" />
         </div>
       </div>
       <button className="btn" type="submit" disabled={submitting}>
@@ -293,6 +300,7 @@ function EditVehicleForm({
   const [renavam, setRenavam] = useState(vehicle.renavam ?? '');
   const [fipeValue, setFipeValue] = useState(vehicle.fipeValue ?? '');
   const [acquisitionCost, setAcquisitionCost] = useState(vehicle.acquisitionCost ?? '');
+  const [priorEarnings, setPriorEarnings] = useState(vehicle.priorEarnings ?? '');
   const [maintenanceIntervalKm, setMaintenanceIntervalKm] = useState(vehicle.maintenanceIntervalKm?.toString() ?? '');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -314,6 +322,7 @@ function EditVehicleForm({
         renavam: renavam || undefined,
         fipeValue: fipeValue || undefined,
         acquisitionCost: acquisitionCost || undefined,
+        priorEarnings: priorEarnings || undefined,
         maintenanceIntervalKm: maintenanceIntervalKm ? Number(maintenanceIntervalKm) : undefined,
       });
       onSaved();
@@ -388,9 +397,13 @@ function EditVehicleForm({
       </div>
       <div className="field-group">
         <div className="field-group__label">Financeiro</div>
-        <div className="field" style={{ marginBottom: 0 }}>
+        <div className="field">
           <label>Quanto custou pra você (R$)</label>
           <input type="number" step="0.01" inputMode="decimal" min="0" value={acquisitionCost} onChange={(e) => setAcquisitionCost(e.target.value)} />
+        </div>
+        <div className="field" style={{ marginBottom: 0 }}>
+          <label>Ganho retroativo (R$)</label>
+          <input type="number" step="0.01" inputMode="decimal" min="0" value={priorEarnings} onChange={(e) => setPriorEarnings(e.target.value)} placeholder="Quanto esse veículo já rendeu antes de entrar no sistema" />
         </div>
       </div>
       <div style={{ display: 'flex', gap: 8 }}>
@@ -407,6 +420,7 @@ function EditVehicleForm({
 
 interface VehicleFinancialSummary {
   acquisitionCost: string | null;
+  priorEarnings: string | null;
   totalReceived: string;
   totalPending: string;
   totalExpenses: string;
@@ -444,7 +458,9 @@ function VehicleFinancialPanel({ vehicle, onClose }: { vehicle: Vehicle; onClose
       </div>
       <p style={{ fontSize: 12, color: 'var(--ink-muted)', marginTop: 0, marginBottom: 14 }}>
         Quanto esse veículo já rendeu de verdade, comparado com o que ele custou. Diferente da Tabela FIPE (que é
-        valor de mercado) — aqui é o retorno financeiro real, com base nos lançamentos e despesas já registrados.
+        valor de mercado) — aqui é o retorno financeiro real. O "ganho retroativo" (edite pelo botão Editar) entra
+        somado ao "Já recebido" — é pra cobrir o período antes desse veículo entrar no sistema, e não aparece em
+        Financeiro → Lançamentos, já que não é uma cobrança de cliente de verdade, é só uma referência histórica.
       </p>
 
       {error && <div className="error-banner">{error}</div>}
@@ -479,6 +495,13 @@ function VehicleFinancialPanel({ vehicle, onClose }: { vehicle: Vehicle; onClose
               </div>
             </div>
           </div>
+          {summary.priorEarnings && (
+            <p style={{ fontSize: 12, color: 'var(--ink-muted)', marginTop: -8, marginBottom: 14 }}>
+              Do total recebido, {formatCurrency(summary.priorEarnings)} é ganho retroativo (informado manualmente,
+              anterior a este veículo entrar no sistema) — por isso pode não bater exatamente com a soma dos
+              lançamentos em Financeiro.
+            </p>
+          )}
           {summary.paybackProgress !== null ? (
             <p style={{ fontSize: 13 }}>
               Esse veículo já se pagou em <strong>{summary.paybackProgress}%</strong> do que custou pra você (recebido
