@@ -187,14 +187,18 @@ export function Contracts() {
   async function handleDeleteContract(contract: Contract) {
     if (
       !window.confirm(
-        `Excluir DEFINITIVAMENTE o contrato de ${contract.customer.name}? Isso não pode ser desfeito. Só funciona se ele nunca tiver sido assinado e não tiver lançamento já pago vinculado — o sistema confere isso antes de excluir.`,
+        `Excluir DEFINITIVAMENTE o contrato de ${contract.customer.name}? Isso NÃO PODE ser desfeito — funciona pra qualquer contrato, assinado ou não, e também apaga qualquer lançamento financeiro vinculado só a ele (mesmo os já pagos).`,
       )
     ) {
       return;
     }
     setError(null);
     try {
-      await api.delete(`/contracts/${contract.id}`);
+      const result = await api.delete<{ deleted: boolean; removedCharges: number }>(`/contracts/${contract.id}`);
+      if (result.removedCharges > 0) {
+        setInvoiceSentMessage(`Contrato excluído — ${result.removedCharges} lançamento(s) vinculado(s) também foram removidos.`);
+        setTimeout(() => setInvoiceSentMessage(null), 5000);
+      }
       load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Erro ao excluir o contrato.');
@@ -394,15 +398,13 @@ export function Contracts() {
                         Cancelar
                       </button>
                     )}
-                    {(c.status === 'draft' || c.status === 'awaiting_signature' || c.status === 'cancelled') && (
-                      <button
-                        className="logout-btn"
-                        style={{ color: 'var(--rtv-danger)', borderColor: 'var(--border)' }}
-                        onClick={() => handleDeleteContract(c)}
-                      >
-                        Excluir
-                      </button>
-                    )}
+                    <button
+                      className="logout-btn"
+                      style={{ color: 'var(--rtv-danger)', borderColor: 'var(--border)' }}
+                      onClick={() => handleDeleteContract(c)}
+                    >
+                      Excluir
+                    </button>
                   </td>
                 </tr>
               ))}

@@ -350,42 +350,15 @@ export class ContractsService {
   }
 
   /**
-   * Exclusão definitiva — só permitida se o contrato NUNCA foi assinado (rascunho
-   * ou aguardando assinatura). Contratos assinados têm força jurídica e histórico
-   * financeiro real; pra esses, use cancel() em vez de remove(). O banco já cuida
-   * de apagar em cascata o que só faz sentido junto do contrato (parcelas,
-   * vistorias, sinalizações) e de desvincular sem apagar o que é um registro real
-   * por si só (multas, avarias, sinistros, lançamentos já gerados).
+   * Exclusão definitiva sem restrição de status — a pedido explícito do
+   * usuário, sobrepondo as travas anteriores (rascunho/assinado/cancelado
+   * não fazem mais diferença aqui). Remove também qualquer lançamento
+   * (Charge) vinculado só a este contrato, incluindo os já pagos.
    */
   async remove(id: string, actor: RequestUser) {
     const contract = await this.findAndAssertSameCompany(id, actor);
 
-    if (contract.status === 'active' || contract.status === 'completed') {
-      throw new BadRequestException(
-        'Este contrato está assinado e ativo/concluído — não pode ser excluído definitivamente. Cancele primeiro se quiser removê-lo das listas.',
-      );
-    }
-
-    // Rascunho/aguardando assinatura: nunca teve força jurídica nem dinheiro
-    // real — pode excluir direto. Cancelado é o caso que precisa de checagem:
-    // pode ter sido cancelado ANTES de assinar (mesma situação seguraacima) ou
-    // DEPOIS (aí teve força jurídica e possivelmente cobrança paga de verdade).
-    if (contract.status === 'cancelled') {
-      const [signature, paidCharge] = await Promise.all([
-        this.prisma.contractSignature.findUnique({ where: { contractId: id } }),
-        this.prisma.charge.findFirst({ where: { contractId: id, status: 'paid' } }),
-      ]);
-      if (signature?.signedAt) {
-        throw new BadRequestException(
-          'Este contrato cancelado chegou a ser assinado antes do cancelamento — tem força jurídica registrada, não pode ser excluído definitivamente.',
-        );
-      }
-      if (paidCharge) {
-        throw new BadRequestException(
-          'Este contrato cancelado tem pelo menos um lançamento já pago vinculado — não pode ser excluído definitivamente, pra preservar o histórico financeiro.',
-        );
-      }
-    }
+    const { count: removedCharges } = await this.prisma.charge.deleteMany({ where: { contractId: id } });
 
     await this.prisma.contract.delete({ where: { id } });
 
@@ -395,10 +368,10 @@ export class ContractsService {
       companyId: actor.companyId,
       entityType: 'Contract',
       entityId: id,
-      metadata: { previousStatus: contract.status },
+      metadata: { previousStatus: contract.status, removedCharges },
     });
 
-    return { deleted: true };
+    return { deleted: true, removedCharges };
   }
 
   async findAll(actor: RequestUser) {
