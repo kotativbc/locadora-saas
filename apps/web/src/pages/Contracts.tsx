@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { api, ApiError, fetchFileUrl, copyToClipboard } from '../api';
+import { formatDateOnly } from '../dateUtils';
 import { StatusBadge, type BadgeVariant } from '../components/StatusBadge';
 import { EmptyState } from '../components/EmptyState';
 
@@ -1002,7 +1003,7 @@ function RentInstallmentsPanel({ contract, onClose }: { contract: Contract; onCl
               <tbody>
                 {installments.map((i) => (
                   <tr key={i.id}>
-                    <td>{new Date(i.dueDate).toLocaleDateString('pt-BR')}</td>
+                    <td>{formatDateOnly(i.dueDate)}</td>
                     <td>{formatCurrency(i.amount)}</td>
                     <td>
                       <button
@@ -1142,7 +1143,7 @@ function CautionInstallmentsPanel({ contract, onClose }: { contract: Contract; o
               <tbody>
                 {installments.map((i) => (
                   <tr key={i.id}>
-                    <td>{new Date(i.dueDate).toLocaleDateString('pt-BR')}</td>
+                    <td>{formatDateOnly(i.dueDate)}</td>
                     <td>{formatCurrency(i.amount)}</td>
                     <td>
                       <button

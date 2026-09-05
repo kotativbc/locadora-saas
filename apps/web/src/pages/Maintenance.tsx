@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { api, ApiError } from '../api';
+import { formatDateOnly } from '../dateUtils';
 import { EmptyState } from '../components/EmptyState';
 
 interface Vehicle {
@@ -101,7 +102,7 @@ export function Maintenance() {
                   </td>
                   <td>{TYPE_LABELS[r.type] ?? r.type}</td>
                   <td>{r.description}</td>
-                  <td>{new Date(r.performedAt).toLocaleDateString('pt-BR')}</td>
+                  <td>{formatDateOnly(r.performedAt)}</td>
                   <td>{r.odometerKm ? `${r.odometerKm.toLocaleString('pt-BR')} km` : '—'}</td>
                   <td>{r.cost ? formatCurrency(r.cost) : '—'}</td>
                   <td>

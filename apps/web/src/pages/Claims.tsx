@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { api, ApiError } from '../api';
 import { StatusSelect, type StatusOption } from '../components/StatusSelect';
+import { formatDateOnly } from '../dateUtils';
 import { EmptyState } from '../components/EmptyState';
 
 interface Vehicle {
@@ -122,7 +123,7 @@ export function Claims() {
                     <span className="plate">{c.vehicle.plate}</span> {c.vehicle.brand} {c.vehicle.model}
                   </td>
                   <td>{TYPE_LABELS[c.type] ?? c.type}</td>
-                  <td>{new Date(c.occurredAt).toLocaleDateString('pt-BR')}</td>
+                  <td>{formatDateOnly(c.occurredAt)}</td>
                   <td>{c.description}</td>
                   <td>{c.estimatedCost ? formatCurrency(c.estimatedCost) : '—'}</td>
                   <td>

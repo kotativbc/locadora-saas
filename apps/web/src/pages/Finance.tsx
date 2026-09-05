@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { api, ApiError } from '../api';
+import { formatDateOnly } from '../dateUtils';
 import { StatusSelect, type StatusOption } from '../components/StatusSelect';
 import { EmptyState } from '../components/EmptyState';
 
@@ -151,7 +152,7 @@ export function Finance() {
                   <td>{c.description}</td>
                   <td>{c.customer?.name ?? '—'}</td>
                   <td>{formatCurrency(c.amount)}</td>
-                  <td>{c.dueDate ? new Date(c.dueDate).toLocaleDateString('pt-BR') : '—'}</td>
+                  <td>{c.dueDate ? formatDateOnly(c.dueDate) : '—'}</td>
                   <td>
                     <StatusSelect
                       value={c.status}

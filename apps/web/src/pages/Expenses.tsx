@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { api, ApiError } from '../api';
+import { formatDateOnly } from '../dateUtils';
 import { EmptyState } from '../components/EmptyState';
 
 interface Vehicle {
@@ -102,7 +103,7 @@ export function Expenses() {
                       '—'
                     )}
                   </td>
-                  <td>{new Date(e.incurredAt).toLocaleDateString('pt-BR')}</td>
+                  <td>{formatDateOnly(e.incurredAt)}</td>
                   <td>{formatCurrency(e.amount)}</td>
                   <td>
                     <button

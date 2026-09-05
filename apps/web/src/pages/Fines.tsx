@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { api, ApiError } from '../api';
+import { formatDateOnly } from '../dateUtils';
 import { StatusSelect, type StatusOption } from '../components/StatusSelect';
 import { EmptyState } from '../components/EmptyState';
 
@@ -133,7 +134,7 @@ export function Fines() {
                   <td>
                     <span className="plate">{f.vehicle.plate}</span> {f.vehicle.brand} {f.vehicle.model}
                   </td>
-                  <td>{new Date(f.infractionDate).toLocaleDateString('pt-BR')}</td>
+                  <td>{formatDateOnly(f.infractionDate)}</td>
                   <td>{f.description}</td>
                   <td>{formatCurrency(f.amount)}</td>
                   <td>{f.chargeToCustomer ? 'Sim' : 'Não'}</td>

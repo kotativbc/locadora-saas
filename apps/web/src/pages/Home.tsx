@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Car, Users, FileText, BarChart3, Building2, History, TrendingUp, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { api, ApiError } from '../api';
+import { formatDateOnly } from '../dateUtils';
 
 interface ChargeByType {
   type: string;
@@ -230,7 +231,7 @@ export function Home() {
                           <ArrowDownCircle size={15} color="var(--rtv-danger)" />
                         )}
                       </td>
-                      <td>{new Date(item.date).toLocaleDateString('pt-BR')}</td>
+                      <td>{item.kind === 'expense' ? formatDateOnly(item.date) : new Date(item.date).toLocaleDateString('pt-BR')}</td>
                       <td>{item.description}</td>
                       <td>{item.label}</td>
                       <td>{item.origin ?? '—'}</td>
