@@ -142,4 +142,26 @@ export class MaintenanceService {
 
     return updated;
   }
+
+  /** Exclui a manutenção e, se houver, a despesa gerada automaticamente a partir dela — senão ficaria uma despesa órfã sem sentido. */
+  async remove(id: string, actor: RequestUser) {
+    const maintenance = await this.findAndAssertSameCompany(id, actor);
+
+    await this.prisma.maintenance.delete({ where: { id } });
+
+    if (maintenance.expenseId) {
+      await this.prisma.expense.delete({ where: { id: maintenance.expenseId } }).catch(() => undefined);
+    }
+
+    await this.auditLog.record({
+      action: 'maintenance.delete',
+      userId: actor.id,
+      companyId: actor.companyId,
+      entityType: 'Maintenance',
+      entityId: id,
+      metadata: { removedLinkedExpense: !!maintenance.expenseId },
+    });
+
+    return { deleted: true };
+  }
 }

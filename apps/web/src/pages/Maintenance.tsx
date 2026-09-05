@@ -60,6 +60,22 @@ export function Maintenance() {
     load();
   }, []);
 
+  async function handleDelete(record: MaintenanceRecord) {
+    const costWarning = record.cost
+      ? ' A despesa gerada automaticamente a partir dela também será excluída.'
+      : '';
+    if (!window.confirm(`Excluir esta manutenção (${record.description})?${costWarning}`)) {
+      return;
+    }
+    setError(null);
+    try {
+      await api.delete(`/maintenance/${record.id}`);
+      load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erro ao excluir a manutenção.');
+    }
+  }
+
   return (
     <div>
       <div className="page-header">
@@ -108,10 +124,17 @@ export function Maintenance() {
                   <td>
                     <button
                       className="logout-btn"
-                      style={{ color: 'var(--primary)', borderColor: 'var(--border)' }}
+                      style={{ color: 'var(--primary)', borderColor: 'var(--border)', marginRight: 6 }}
                       onClick={() => setEditTarget(r)}
                     >
                       Editar
+                    </button>
+                    <button
+                      className="logout-btn"
+                      style={{ color: 'var(--rtv-danger)', borderColor: 'var(--border)' }}
+                      onClick={() => handleDelete(r)}
+                    >
+                      Excluir
                     </button>
                   </td>
                 </tr>

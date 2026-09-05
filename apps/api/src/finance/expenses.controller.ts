@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
 import { ExpensesService } from './expenses.service';
 import { CreateExpenseDto } from './dto/create-expense.dto';
 import { UpdateExpenseDto } from './dto/update-expense.dto';
@@ -25,5 +25,10 @@ export class ExpensesController {
   @Patch(':id')
   update(@Param('id') id: string, @Body() dto: UpdateExpenseDto, @CurrentUser() actor: RequestUser) {
     return this.expensesService.update(id, dto, actor);
+  }
+
+  @Delete(':id')
+  remove(@Param('id') id: string, @CurrentUser() actor: RequestUser) {
+    return this.expensesService.remove(id, actor);
   }
 }

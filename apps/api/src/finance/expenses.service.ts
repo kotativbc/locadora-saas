@@ -99,4 +99,29 @@ export class ExpensesService {
 
     return updated;
   }
+
+  /**
+   * Se essa despesa tiver sido gerada automaticamente a partir de uma
+   * manutenção, excluir aqui só desvincula (o banco já cuida disso sozinho,
+   * onDelete: SetNull) — a manutenção continua existindo, só perde a
+   * despesa vinculada até ser editada de novo.
+   */
+  async remove(id: string, actor: RequestUser) {
+    const expense = await this.findAndAssertSameCompany(id, actor);
+
+    const linkedMaintenance = await this.prisma.maintenance.findUnique({ where: { expenseId: id } });
+
+    await this.prisma.expense.delete({ where: { id } });
+
+    await this.auditLog.record({
+      action: 'expense.delete',
+      userId: actor.id,
+      companyId: actor.companyId,
+      entityType: 'Expense',
+      entityId: id,
+      metadata: { description: expense.description, amount: expense.amount.toString(), unlinkedMaintenanceId: linkedMaintenance?.id ?? null },
+    });
+
+    return { deleted: true, unlinkedMaintenanceId: linkedMaintenance?.id ?? null };
+  }
 }

@@ -56,6 +56,23 @@ export function Expenses() {
     load();
   }, []);
 
+  async function handleDelete(expense: Expense) {
+    const maybeLinkedWarning =
+      expense.category === 'maintenance'
+        ? ' Se ela tiver nascido automaticamente de um registro de manutenção, essa manutenção não é apagada — só perde o vínculo com essa despesa.'
+        : '';
+    if (!window.confirm(`Excluir a despesa "${expense.description}"?${maybeLinkedWarning}`)) {
+      return;
+    }
+    setError(null);
+    try {
+      await api.delete(`/expenses/${expense.id}`);
+      load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erro ao excluir a despesa.');
+    }
+  }
+
   return (
     <div>
       <div className="page-header">
@@ -108,10 +125,17 @@ export function Expenses() {
                   <td>
                     <button
                       className="logout-btn"
-                      style={{ color: 'var(--primary)', borderColor: 'var(--border)' }}
+                      style={{ color: 'var(--primary)', borderColor: 'var(--border)', marginRight: 6 }}
                       onClick={() => setEditTarget(e)}
                     >
                       Editar
+                    </button>
+                    <button
+                      className="logout-btn"
+                      style={{ color: 'var(--rtv-danger)', borderColor: 'var(--border)' }}
+                      onClick={() => handleDelete(e)}
+                    >
+                      Excluir
                     </button>
                   </td>
                 </tr>
