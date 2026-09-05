@@ -22,6 +22,23 @@ export class MaintenanceService {
       throw new NotFoundException('Veículo não encontrado nesta empresa.');
     }
 
+    // Se tem custo, já nasce como despesa de verdade — é o que faz o valor
+    // contar em Financeiro → Despesas e nos relatórios/desempenho do veículo.
+    let expenseId: string | undefined;
+    if (dto.cost) {
+      const expense = await this.prisma.expense.create({
+        data: {
+          companyId: actor.companyId,
+          vehicleId: dto.vehicleId,
+          category: 'maintenance',
+          description: `Manutenção — ${dto.description}`,
+          amount: dto.cost,
+          createdByUserId: actor.id,
+        },
+      });
+      expenseId = expense.id;
+    }
+
     const maintenance = await this.prisma.maintenance.create({
       data: {
         companyId: actor.companyId,
@@ -30,6 +47,7 @@ export class MaintenanceService {
         description: dto.description,
         odometerKm: dto.odometerKm,
         cost: dto.cost,
+        expenseId,
         vendor: dto.vendor,
         nextDueDate: dto.nextDueDate ? new Date(dto.nextDueDate) : undefined,
         nextDueKm: dto.nextDueKm,
@@ -69,7 +87,7 @@ export class MaintenanceService {
   }
 
   async update(id: string, dto: UpdateMaintenanceDto, actor: RequestUser) {
-    await this.findAndAssertSameCompany(id, actor);
+    const maintenance = await this.findAndAssertSameCompany(id, actor);
 
     const updated = await this.prisma.maintenance.update({
       where: { id },
@@ -84,6 +102,34 @@ export class MaintenanceService {
         nextDueKm: dto.nextDueKm,
       },
     });
+
+    // Mantém a despesa vinculada em dia — cria se ainda não existir (ex: essa
+    // manutenção nasceu sem custo e agora ganhou um), ou atualiza a existente.
+    if (dto.cost !== undefined) {
+      if (maintenance.expenseId) {
+        await this.prisma.expense.update({
+          where: { id: maintenance.expenseId },
+          data: {
+            amount: dto.cost,
+            description: `Manutenção — ${dto.description ?? maintenance.description}`,
+            incurredAt: dto.performedAt ? new Date(dto.performedAt) : undefined,
+          },
+        });
+      } else if (dto.cost) {
+        const expense = await this.prisma.expense.create({
+          data: {
+            companyId: actor.companyId!,
+            vehicleId: maintenance.vehicleId,
+            category: 'maintenance',
+            description: `Manutenção — ${dto.description ?? maintenance.description}`,
+            amount: dto.cost,
+            incurredAt: dto.performedAt ? new Date(dto.performedAt) : maintenance.performedAt,
+            createdByUserId: actor.id,
+          },
+        });
+        await this.prisma.maintenance.update({ where: { id }, data: { expenseId: expense.id } });
+      }
+    }
 
     await this.auditLog.record({
       action: 'maintenance.update',

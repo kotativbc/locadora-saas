@@ -187,7 +187,7 @@ export function Contracts() {
   async function handleDeleteContract(contract: Contract) {
     if (
       !window.confirm(
-        `Excluir DEFINITIVAMENTE o contrato de ${contract.customer.name}? Isso não pode ser desfeito. Só é permitido porque ele nunca foi assinado.`,
+        `Excluir DEFINITIVAMENTE o contrato de ${contract.customer.name}? Isso não pode ser desfeito. Só funciona se ele nunca tiver sido assinado e não tiver lançamento já pago vinculado — o sistema confere isso antes de excluir.`,
       )
     ) {
       return;
@@ -394,7 +394,7 @@ export function Contracts() {
                         Cancelar
                       </button>
                     )}
-                    {(c.status === 'draft' || c.status === 'awaiting_signature') && (
+                    {(c.status === 'draft' || c.status === 'awaiting_signature' || c.status === 'cancelled') && (
                       <button
                         className="logout-btn"
                         style={{ color: 'var(--rtv-danger)', borderColor: 'var(--border)' }}

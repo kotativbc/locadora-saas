@@ -359,10 +359,32 @@ export class ContractsService {
    */
   async remove(id: string, actor: RequestUser) {
     const contract = await this.findAndAssertSameCompany(id, actor);
-    if (contract.status !== 'draft' && contract.status !== 'awaiting_signature') {
+
+    if (contract.status === 'active' || contract.status === 'completed') {
       throw new BadRequestException(
-        'Este contrato já foi assinado — não pode ser excluído definitivamente (tem força jurídica e possivelmente histórico financeiro real). Use "cancelar" em vez disso.',
+        'Este contrato está assinado e ativo/concluído — não pode ser excluído definitivamente. Cancele primeiro se quiser removê-lo das listas.',
       );
+    }
+
+    // Rascunho/aguardando assinatura: nunca teve força jurídica nem dinheiro
+    // real — pode excluir direto. Cancelado é o caso que precisa de checagem:
+    // pode ter sido cancelado ANTES de assinar (mesma situação seguraacima) ou
+    // DEPOIS (aí teve força jurídica e possivelmente cobrança paga de verdade).
+    if (contract.status === 'cancelled') {
+      const [signature, paidCharge] = await Promise.all([
+        this.prisma.contractSignature.findUnique({ where: { contractId: id } }),
+        this.prisma.charge.findFirst({ where: { contractId: id, status: 'paid' } }),
+      ]);
+      if (signature?.signedAt) {
+        throw new BadRequestException(
+          'Este contrato cancelado chegou a ser assinado antes do cancelamento — tem força jurídica registrada, não pode ser excluído definitivamente.',
+        );
+      }
+      if (paidCharge) {
+        throw new BadRequestException(
+          'Este contrato cancelado tem pelo menos um lançamento já pago vinculado — não pode ser excluído definitivamente, pra preservar o histórico financeiro.',
+        );
+      }
     }
 
     await this.prisma.contract.delete({ where: { id } });
@@ -373,6 +395,7 @@ export class ContractsService {
       companyId: actor.companyId,
       entityType: 'Contract',
       entityId: id,
+      metadata: { previousStatus: contract.status },
     });
 
     return { deleted: true };
