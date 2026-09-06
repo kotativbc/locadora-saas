@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, Post } from '@nestjs/common';
 import { InspectionsService } from './inspections.service';
 import { CreateInspectionDto } from './dto/create-inspection.dto';
+import { GenerateInspectionLinkDto } from './dto/generate-inspection-link.dto';
 import { RequirePermissions } from '../rbac/permissions.decorator';
 import { PermissionCode } from '../rbac/rbac.constants';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -19,5 +20,14 @@ export class InspectionsController {
   @Get('by-contract/:contractId')
   findAllForContract(@Param('contractId') contractId: string, @CurrentUser() actor: RequestUser) {
     return this.inspectionsService.findAllForContract(contractId, actor);
+  }
+
+  @Post('by-contract/:contractId/link')
+  generateLink(
+    @Param('contractId') contractId: string,
+    @Body() dto: GenerateInspectionLinkDto,
+    @CurrentUser() actor: RequestUser,
+  ) {
+    return this.inspectionsService.generateLink(contractId, dto.type, actor);
   }
 }

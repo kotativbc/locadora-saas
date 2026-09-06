@@ -5,5 +5,6 @@ import { InspectionsController } from './inspections.controller';
 @Module({
   controllers: [InspectionsController],
   providers: [InspectionsService],
+  exports: [InspectionsService],
 })
 export class InspectionsModule {}

@@ -81,6 +81,8 @@ export function Contracts() {
   const [error, setError] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [linkInfo, setLinkInfo] = useState<{ contractId: string; url: string } | null>(null);
+  const [inspectionLinkInfo, setInspectionLinkInfo] = useState<{ url: string; type: 'delivery' | 'return' } | null>(null);
+  const [inspectionCopyStatus, setInspectionCopyStatus] = useState<'idle' | 'copied' | 'failed'>('idle');
   const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'failed'>('idle');
   const [inspectionTarget, setInspectionTarget] = useState<{ contract: Contract; type: 'delivery' | 'return' } | null>(
     null,
@@ -130,6 +132,27 @@ export function Contracts() {
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Erro ao gerar link de assinatura.');
     }
+  }
+
+  async function handleGenerateInspectionLink(contractId: string, type: 'delivery' | 'return') {
+    setError(null);
+    setInspectionCopyStatus('idle');
+    try {
+      const { token } = await api.post<{ token: string; expiresAt: string }>(
+        `/inspections/by-contract/${contractId}/link`,
+        { type },
+      );
+      const publicUrl = `${window.location.origin}/vistoria/${token}`;
+      setInspectionLinkInfo({ url: publicUrl, type });
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erro ao gerar link de vistoria.');
+    }
+  }
+
+  async function handleCopyInspectionLink() {
+    if (!inspectionLinkInfo) return;
+    const ok = await copyToClipboard(inspectionLinkInfo.url);
+    setInspectionCopyStatus(ok ? 'copied' : 'failed');
   }
 
   async function handleCopyLink() {
@@ -247,6 +270,39 @@ export function Contracts() {
         </div>
       )}
 
+      {inspectionLinkInfo && (
+        <div className="card" style={{ borderColor: 'var(--accent)' }}>
+          <strong>Link de vistoria de {inspectionLinkInfo.type === 'delivery' ? 'entrega' : 'devolução'} gerado</strong>
+          <p style={{ fontSize: 13, color: 'var(--ink-muted)' }}>
+            Abra este link no celular/tablet e preencha junto com o cliente na hora — é pra uso imediato, presencial
+            (válido por 6h). O cliente confirma o checklist e assina na tela ao final.
+          </p>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input readOnly value={inspectionLinkInfo.url} style={{ flex: 1, padding: 8, fontFamily: 'var(--font-mono)', fontSize: 12 }} />
+            <button className="btn" onClick={handleCopyInspectionLink}>
+              {inspectionCopyStatus === 'copied' ? 'Copiado ✓' : 'Copiar'}
+            </button>
+          </div>
+          {inspectionCopyStatus === 'failed' && (
+            <p style={{ fontSize: 12, color: 'var(--danger)', marginTop: 8, marginBottom: 0 }}>
+              Não consegui copiar automaticamente — selecione o texto no campo acima e copie manualmente.
+            </p>
+          )}
+          <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+            <a href={inspectionLinkInfo.url} target="_blank" rel="noreferrer" className="btn" style={{ textDecoration: 'none' }}>
+              Abrir agora
+            </a>
+            <button
+              className="logout-btn"
+              style={{ color: 'var(--ink-muted)', borderColor: 'var(--border)' }}
+              onClick={() => setInspectionLinkInfo(null)}
+            >
+              Fechar
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <strong>{contracts.length} contrato(s)</strong>
@@ -321,22 +377,40 @@ export function Contracts() {
                       </button>
                     )}
                     {c.status === 'active' && !c.deliveredAt && (
-                      <button
-                        className="logout-btn"
-                        style={{ color: 'var(--primary)', borderColor: 'var(--border)' }}
-                        onClick={() => setInspectionTarget({ contract: c, type: 'delivery' })}
-                      >
-                        Registrar entrega
-                      </button>
+                      <>
+                        <button
+                          className="logout-btn"
+                          style={{ color: 'var(--primary)', borderColor: 'var(--border)' }}
+                          onClick={() => setInspectionTarget({ contract: c, type: 'delivery' })}
+                        >
+                          Registrar entrega
+                        </button>
+                        <button
+                          className="logout-btn"
+                          style={{ color: 'var(--rtv-teal-600)', borderColor: 'var(--border)' }}
+                          onClick={() => handleGenerateInspectionLink(c.id, 'delivery')}
+                        >
+                          Link de vistoria (entrega)
+                        </button>
+                      </>
                     )}
                     {c.status === 'active' && c.deliveredAt && !c.returnedAt && (
-                      <button
-                        className="logout-btn"
-                        style={{ color: 'var(--primary)', borderColor: 'var(--border)' }}
-                        onClick={() => setInspectionTarget({ contract: c, type: 'return' })}
-                      >
-                        Registrar devolução
-                      </button>
+                      <>
+                        <button
+                          className="logout-btn"
+                          style={{ color: 'var(--primary)', borderColor: 'var(--border)' }}
+                          onClick={() => setInspectionTarget({ contract: c, type: 'return' })}
+                        >
+                          Registrar devolução
+                        </button>
+                        <button
+                          className="logout-btn"
+                          style={{ color: 'var(--rtv-teal-600)', borderColor: 'var(--border)' }}
+                          onClick={() => handleGenerateInspectionLink(c.id, 'return')}
+                        >
+                          Link de vistoria (devolução)
+                        </button>
+                      </>
                     )}
                     {c.templateType === 'protected' && (
                       <button

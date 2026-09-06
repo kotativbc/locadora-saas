@@ -19,6 +19,7 @@ import { Rates } from './pages/Rates';
 import { Contracts } from './pages/Contracts';
 import { PublicSign } from './pages/PublicSign';
 import { PublicMaintenanceReport } from './pages/PublicMaintenanceReport';
+import { PublicInspection } from './pages/PublicInspection';
 import { Maintenance } from './pages/Maintenance';
 import { Damages } from './pages/Damages';
 import { Claims } from './pages/Claims';
@@ -39,6 +40,7 @@ export function App() {
           <Route path="/redefinir-senha/:token" element={<ResetPassword />} />
           <Route path="/assinar/:token" element={<PublicSign />} />
           <Route path="/sinalizar/:token" element={<PublicMaintenanceReport />} />
+          <Route path="/vistoria/:token" element={<PublicInspection />} />
           <Route element={<RequireAuth />}>
             <Route element={<Layout />}>
               <Route path="/" element={<Home />} />
