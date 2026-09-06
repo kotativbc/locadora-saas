@@ -92,6 +92,11 @@ function formatDate(d: Date) {
   return d.toLocaleDateString('pt-BR');
 }
 
+/** Servidor roda em UTC — sem especificar o fuso, a hora sairia sempre 3h à frente de Brasília. */
+function formatDateTime(d: Date) {
+  return d.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+}
+
 function formatCurrency(v: string | null) {
   if (!v) return 'a combinar';
   return Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -316,7 +321,7 @@ export function MonthlyDriverContractPdfDocument({
             <>
               <Text style={styles.signatureSigned}>ASSINADO ELETRONICAMENTE</Text>
               <Text style={styles.small}>
-                Aceito em {signature.signedAt.toLocaleString('pt-BR')}
+                Aceito em {formatDateTime(signature.signedAt)}
                 {signature.signerIp ? ` a partir do IP ${signature.signerIp}` : ''}.
               </Text>
               {signature.termsHash && (
@@ -341,7 +346,7 @@ export function MonthlyDriverContractPdfDocument({
           <>
             <View style={styles.row}>
               <Text style={styles.label}>Data/hora</Text>
-              <Text style={styles.value}>{inspections.delivery.performedAt.toLocaleString('pt-BR')}</Text>
+              <Text style={styles.value}>{formatDateTime(inspections.delivery.performedAt)}</Text>
             </View>
             <View style={styles.row}>
               <Text style={styles.label}>Odômetro</Text>
@@ -370,7 +375,7 @@ export function MonthlyDriverContractPdfDocument({
           <>
             <View style={styles.row}>
               <Text style={styles.label}>Data/hora</Text>
-              <Text style={styles.value}>{inspections.return.performedAt.toLocaleString('pt-BR')}</Text>
+              <Text style={styles.value}>{formatDateTime(inspections.return.performedAt)}</Text>
             </View>
             <View style={styles.row}>
               <Text style={styles.label}>Odômetro</Text>

@@ -55,6 +55,11 @@ function formatDate(d: Date) {
   return d.toLocaleDateString('pt-BR');
 }
 
+/** Servidor roda em UTC — sem especificar o fuso, a hora sairia sempre 3h à frente de Brasília. */
+function formatDateTime(d: Date) {
+  return d.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+}
+
 function formatCurrency(v: string) {
   return Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
@@ -145,7 +150,7 @@ export function ContractPdfDocument({ company, customer, vehicle, contract, sign
             <>
               <Text style={styles.signatureSigned}>ASSINADO ELETRONICAMENTE</Text>
               <Text style={styles.small}>
-                Aceito em {signature.signedAt.toLocaleString('pt-BR')}
+                Aceito em {formatDateTime(signature.signedAt)}
                 {signature.signerIp ? ` a partir do IP ${signature.signerIp}` : ''}.
               </Text>
               {signature.termsHash && (

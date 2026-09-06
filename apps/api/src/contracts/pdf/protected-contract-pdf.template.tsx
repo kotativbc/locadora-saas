@@ -75,7 +75,7 @@ export interface ProtectedContractPdfData {
 }
 
 function formatDateTime(d: Date) {
-  return `${d.toLocaleDateString('pt-BR')} às ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+  return `${d.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })} às ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' })}`;
 }
 
 function formatDate(d: Date) {
@@ -301,7 +301,7 @@ export function ProtectedContractPdfDocument({
             <>
               <Text style={styles.signatureSigned}>ASSINADO ELETRONICAMENTE</Text>
               <Text style={styles.small}>
-                Aceito em {signature.signedAt.toLocaleString('pt-BR')}
+                Aceito em {formatDateTime(signature.signedAt)}
                 {signature.signerIp ? ` a partir do IP ${signature.signerIp}` : ''}.
               </Text>
               {signature.termsHash && (

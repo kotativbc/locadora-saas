@@ -39,6 +39,25 @@ function calculatePeriodValue(dailyRate: string, weeklyRate: string | null | und
   return (Number(dailyRate) * days).toFixed(2);
 }
 
+/**
+ * Monta o resumo da vistoria pro PDF — só se ela tiver sido realmente
+ * concluída. Uma vistoria "pendente" (link de vistoria digital gerado mas
+ * ainda não preenchido/assinado) tem odometerKm/fuelLevel nulos; nesse caso
+ * tratamos como se a vistoria não tivesse acontecido ainda, em vez de
+ * quebrar o PDF com dado incompleto.
+ */
+function toInspectionSummary(
+  insp: { performedAt: Date; odometerKm: number | null; fuelLevel: string | null; exteriorNotes: string | null } | null,
+): { performedAt: Date; odometerKm: number; fuelLevel: string; exteriorNotes: string | null } | null {
+  if (!insp || insp.odometerKm === null || insp.fuelLevel === null) return null;
+  return {
+    performedAt: insp.performedAt,
+    odometerKm: insp.odometerKm,
+    fuelLevel: insp.fuelLevel,
+    exteriorNotes: insp.exteriorNotes,
+  };
+}
+
 @Injectable()
 export class ContractsService {
   constructor(
@@ -738,8 +757,8 @@ export class ContractsService {
 
     if (contract.templateType === 'monthly_app_driver') {
       const [deliveryInspection, returnInspection, rentInstallments] = await Promise.all([
-        this.prisma.inspection.findFirst({ where: { contractId, type: 'delivery' }, orderBy: { performedAt: 'desc' } }),
-        this.prisma.inspection.findFirst({ where: { contractId, type: 'return' }, orderBy: { performedAt: 'desc' } }),
+        this.prisma.inspection.findFirst({ where: { contractId, type: 'delivery', odometerKm: { not: null } }, orderBy: { performedAt: 'desc' } }),
+        this.prisma.inspection.findFirst({ where: { contractId, type: 'return', odometerKm: { not: null } }, orderBy: { performedAt: 'desc' } }),
         this.prisma.rentInstallment.findMany({ where: { contractId }, orderBy: { dueDate: 'asc' } }),
       ]);
 
@@ -805,22 +824,8 @@ export class ContractsService {
               }
             : null,
         inspections: {
-          delivery: deliveryInspection
-            ? {
-                performedAt: deliveryInspection.performedAt,
-                odometerKm: deliveryInspection.odometerKm,
-                fuelLevel: deliveryInspection.fuelLevel,
-                exteriorNotes: deliveryInspection.exteriorNotes,
-              }
-            : null,
-          return: returnInspection
-            ? {
-                performedAt: returnInspection.performedAt,
-                odometerKm: returnInspection.odometerKm,
-                fuelLevel: returnInspection.fuelLevel,
-                exteriorNotes: returnInspection.exteriorNotes,
-              }
-            : null,
+          delivery: toInspectionSummary(deliveryInspection),
+          return: toInspectionSummary(returnInspection),
         },
         rentInstallments: rentInstallments.map((i: { dueDate: Date; amount: { toString(): string } }) => ({
           dueDate: i.dueDate,
@@ -831,8 +836,8 @@ export class ContractsService {
 
     if (contract.templateType === 'protected') {
       const [deliveryInspection, returnInspection, cautionInstallments] = await Promise.all([
-        this.prisma.inspection.findFirst({ where: { contractId, type: 'delivery' }, orderBy: { performedAt: 'desc' } }),
-        this.prisma.inspection.findFirst({ where: { contractId, type: 'return' }, orderBy: { performedAt: 'desc' } }),
+        this.prisma.inspection.findFirst({ where: { contractId, type: 'delivery', odometerKm: { not: null } }, orderBy: { performedAt: 'desc' } }),
+        this.prisma.inspection.findFirst({ where: { contractId, type: 'return', odometerKm: { not: null } }, orderBy: { performedAt: 'desc' } }),
         this.prisma.cautionInstallment.findMany({ where: { contractId }, orderBy: { dueDate: 'asc' } }),
       ]);
 
@@ -891,22 +896,8 @@ export class ContractsService {
               }
             : null,
         inspections: {
-          delivery: deliveryInspection
-            ? {
-                performedAt: deliveryInspection.performedAt,
-                odometerKm: deliveryInspection.odometerKm,
-                fuelLevel: deliveryInspection.fuelLevel,
-                exteriorNotes: deliveryInspection.exteriorNotes,
-              }
-            : null,
-          return: returnInspection
-            ? {
-                performedAt: returnInspection.performedAt,
-                odometerKm: returnInspection.odometerKm,
-                fuelLevel: returnInspection.fuelLevel,
-                exteriorNotes: returnInspection.exteriorNotes,
-              }
-            : null,
+          delivery: toInspectionSummary(deliveryInspection),
+          return: toInspectionSummary(returnInspection),
         },
         cautionInstallments: cautionInstallments.map((i: { dueDate: Date; amount: { toString(): string } }) => ({
           dueDate: i.dueDate,
