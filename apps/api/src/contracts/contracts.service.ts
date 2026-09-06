@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import * as crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
+import { Prisma } from '@prisma/client';
 import { AuditLogService } from '../common/audit-log.service';
 import { ContractPdfService } from './pdf/contract-pdf.service';
 import { ChargeGeneratorService } from '../finance/charge-generator.service';
@@ -110,23 +111,35 @@ export class ContractsService {
       totalValue = dto.totalValueOverride;
     }
 
-    const contract = await this.prisma.contract.create({
-      data: {
-        companyId: actor.companyId,
-        customerId: dto.customerId,
-        vehicleId: dto.vehicleId,
-        ratePlanId: dto.ratePlanId,
-        templateType,
-        startDate,
-        endDate,
-        dailyRateSnapshot: dailyRate,
-        totalValue,
-        monthlyKmLimitSnapshot,
-        extraKmRateSnapshot,
-        cautionAmountSnapshot,
-        status: 'draft',
-        createdByUserId: actor.id,
-      },
+    // Número sequencial por empresa (1, 2, 3...) — incrementado atomicamente
+    // dentro da mesma transação que cria o contrato, pra nunca duplicar mesmo
+    // se dois contratos forem criados ao mesmo tempo.
+    const contract = await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      const company = await tx.company.update({
+        where: { id: actor.companyId! },
+        data: { nextContractNumber: { increment: 1 } },
+        select: { nextContractNumber: true },
+      });
+
+      return tx.contract.create({
+        data: {
+          number: company.nextContractNumber,
+          companyId: actor.companyId!,
+          customerId: dto.customerId,
+          vehicleId: dto.vehicleId,
+          ratePlanId: dto.ratePlanId,
+          templateType,
+          startDate,
+          endDate,
+          dailyRateSnapshot: dailyRate,
+          totalValue,
+          monthlyKmLimitSnapshot,
+          extraKmRateSnapshot,
+          cautionAmountSnapshot,
+          status: 'draft',
+          createdByUserId: actor.id,
+        },
+      });
     });
 
     await this.auditLog.record({
@@ -408,7 +421,7 @@ export class ContractsService {
 
     return this.pdfService.renderInvoice({
       contractId: contract.id,
-      invoiceNumber: contract.id.slice(0, 8).toUpperCase(),
+      invoiceNumber: contract.number ? String(contract.number) : contract.id.slice(0, 8).toUpperCase(),
       issuedAt: new Date(),
       company: {
         name: contract.company.name,
@@ -466,7 +479,7 @@ export class ContractsService {
 
     const pdfBuffer = await this.buildInvoicePdf(contractId, actor);
     const companyLabel = contract.company.tradeName ?? contract.company.name;
-    const invoiceNumber = contract.id.slice(0, 8).toUpperCase();
+    const invoiceNumber = contract.number ? String(contract.number) : contract.id.slice(0, 8).toUpperCase();
 
     const result = await this.emailAdapter.send({
       to: contract.customer.email,
@@ -675,7 +688,7 @@ export class ContractsService {
       customerId: contract.customerId,
       contractId: contract.id,
       type: 'other',
-      description: `Multa por devolução antecipada — contrato ${contract.id.slice(0, 8)} (${daysRemaining} dia(s) restante(s))`,
+      description: `Multa por devolução antecipada — contrato ${contract.number ?? contract.id.slice(0, 8)} (${daysRemaining} dia(s) restante(s))`,
       amount: penalty,
     });
 
@@ -732,6 +745,7 @@ export class ContractsService {
 
       return this.pdfService.renderMonthlyDriverContract({
         contractId: contract.id,
+        contractNumber: contract.number,
         company: {
           name: contract.company.name,
           tradeName: contract.company.tradeName,
@@ -824,6 +838,7 @@ export class ContractsService {
 
       return this.pdfService.renderProtectedContract({
         contractId: contract.id,
+        contractNumber: contract.number,
         company: {
           name: contract.company.name,
           tradeName: contract.company.tradeName,

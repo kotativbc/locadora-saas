@@ -22,6 +22,7 @@ const styles = StyleSheet.create({
 
 export interface ProtectedContractPdfData {
   contractId: string;
+  contractNumber: number | null;
   company: {
     name: string;
     tradeName: string | null;
@@ -117,6 +118,7 @@ function FuelRow({ selected }: { selected: string | null }) {
 
 export function ProtectedContractPdfDocument({
   contractId,
+  contractNumber,
   company,
   customer,
   vehicle,
@@ -126,7 +128,7 @@ export function ProtectedContractPdfDocument({
   cautionInstallments,
 }: ProtectedContractPdfData) {
   const companyLabel = company.tradeName ?? company.name;
-  const shortId = contractId.slice(0, 8).toUpperCase();
+  const shortId = contractNumber ? String(contractNumber) : contractId.slice(0, 8).toUpperCase();
   const cityForo = company.addressCity ?? '[cidade não cadastrada]';
   const stateForo = company.addressState ?? '';
   const companyAddress =

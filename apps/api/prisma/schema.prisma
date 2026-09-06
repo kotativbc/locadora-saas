@@ -14,6 +14,7 @@ model Company {
   tradeName    String?
   cnpj         String?  @unique
   logoPath     String? // caminho relativo dentro de /srv/rental-data/uploads, nunca uma URL pública direta
+  nextContractNumber Int @default(0) // contador pro número sequencial de contrato desta empresa (1, 2, 3...) — incrementado atomicamente a cada contrato novo
   status       String   @default("active") // pending | trial | active | past_due | suspended | cancelled | archived | security_blocked
   statusReason String? // motivo do estado atual (obrigatório ao suspender/cancelar/bloquear)
   planId       String?
@@ -392,6 +393,7 @@ model RatePlan {
 /// Contrato de locação — o núcleo da operação.
 model Contract {
   id                String    @id @default(uuid())
+  number            Int? // número sequencial por empresa (1, 2, 3...) — null só nos contratos criados antes desta funcionalidade, até rodar o backfill
   companyId         String
   company           Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
   customerId        String
@@ -433,6 +435,7 @@ model Contract {
   @@index([companyId])
   @@index([customerId])
   @@index([vehicleId])
+  @@unique([companyId, number])
   @@map("contracts")
 }
 

@@ -112,7 +112,7 @@ export class PublicSignaturesService {
           customerId: c.customerId,
           contractId: c.id,
           type: 'rental',
-          description: `Locação — contrato ${c.id.slice(0, 8)} — parcela ${index + 1}/${rentInstallments.length}`,
+          description: `Locação — contrato ${c.number ?? c.id.slice(0, 8)} — parcela ${index + 1}/${rentInstallments.length}`,
           amount: installment.amount.toString(),
           dueDate: installment.dueDate,
         });
@@ -123,7 +123,7 @@ export class PublicSignaturesService {
         customerId: c.customerId,
         contractId: c.id,
         type: 'rental',
-        description: `Locação — contrato ${c.id.slice(0, 8)}`,
+        description: `Locação — contrato ${c.number ?? c.id.slice(0, 8)}`,
         amount: c.totalValue.toString(),
         dueDate: c.endDate,
       });

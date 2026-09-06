@@ -29,6 +29,7 @@ const styles = StyleSheet.create({
 
 export interface MonthlyDriverContractPdfData {
   contractId: string;
+  contractNumber: number | null;
   company: {
     name: string;
     tradeName: string | null;
@@ -125,6 +126,7 @@ const FUEL_LABELS: Record<string, string> = {
 
 export function MonthlyDriverContractPdfDocument({
   contractId,
+  contractNumber,
   company,
   customer,
   vehicle,
@@ -136,7 +138,7 @@ export function MonthlyDriverContractPdfDocument({
   const companyLabel = company.tradeName ?? company.name;
   const cityForo = company.addressCity ?? '[cidade não cadastrada]';
   const stateForo = company.addressState ?? '';
-  const shortId = contractId.slice(0, 8).toUpperCase();
+  const shortId = contractNumber ? String(contractNumber) : contractId.slice(0, 8).toUpperCase();
   const cnhLabel = [customer.driverLicenseNumber, customer.driverLicenseCategory]
     .filter(Boolean)
     .join(' — categoria ');

@@ -31,6 +31,7 @@ interface RatePlan {
 
 interface Contract {
   id: string;
+  number: number | null;
   status: string;
   templateType: string;
   startDate: string;
@@ -262,6 +263,7 @@ export function Contracts() {
           <table>
             <thead>
               <tr>
+                <th>Nº</th>
                 <th>Cliente</th>
                 <th>Veículo</th>
                 <th>Período</th>
@@ -274,6 +276,7 @@ export function Contracts() {
             <tbody>
               {contracts.map((c) => (
                 <tr key={c.id}>
+                  <td>{c.number ?? '—'}</td>
                   <td>{c.customer.name}</td>
                   <td>
                     <span className="plate">{c.vehicle.plate}</span> {c.vehicle.brand} {c.vehicle.model}
