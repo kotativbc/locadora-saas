@@ -34,6 +34,7 @@ interface RecentExpense {
 interface FinancialSummary {
   totalReceivable: string;
   totalReceived: string;
+  totalPriorEarnings: string;
   totalExpenses: string;
   balance: string;
   chargesByType: ChargeByType[];
@@ -46,6 +47,70 @@ interface FinancialSummary {
 interface Company {
   id: string;
   status: string;
+}
+
+interface OperationsDashboard {
+  fleetByStatus: Record<string, number>;
+  contractsByStatus: Record<string, number>;
+  upcomingPayments: { id: string; description: string; amount: string; dueDate: string | null; customerName: string | null; vehiclePlate: string | null }[];
+  overdue: { count: number; total: string };
+  maintenanceReminders: { vehicleId: string; plate: string; brand: string; model: string; reason: string }[];
+}
+
+const FLEET_STATUS_LABELS: Record<string, string> = {
+  available: 'Disponível',
+  rented: 'Locado',
+  maintenance: 'Manutenção',
+  inactive: 'Inativo',
+};
+const FLEET_STATUS_COLORS: Record<string, string> = {
+  available: 'var(--rtv-success)',
+  rented: 'var(--rtv-teal-600)',
+  maintenance: 'var(--rtv-warning)',
+  inactive: 'var(--ink-muted)',
+};
+
+const CONTRACT_STATUS_LABELS: Record<string, string> = {
+  draft: 'Rascunho',
+  awaiting_signature: 'Aguardando assinatura',
+  active: 'Ativo',
+  completed: 'Concluído',
+  cancelled: 'Cancelado',
+};
+const CONTRACT_STATUS_COLORS: Record<string, string> = {
+  draft: 'var(--ink-muted)',
+  awaiting_signature: 'var(--rtv-warning)',
+  active: 'var(--rtv-success)',
+  completed: 'var(--rtv-teal-600)',
+  cancelled: 'var(--rtv-danger)',
+};
+
+function StatusBarChart({ data, labels, colors }: { data: Record<string, number>; labels: Record<string, string>; colors: Record<string, string> }) {
+  const total = Object.values(data).reduce((a, b) => a + b, 0);
+  if (total === 0) return <p style={{ fontSize: 12.5, color: 'var(--ink-muted)', margin: 0 }}>Nenhum dado ainda.</p>;
+  return (
+    <div>
+      <div style={{ display: 'flex', height: 22, borderRadius: 6, overflow: 'hidden', marginBottom: 10 }}>
+        {Object.entries(data).map(
+          ([key, count]) =>
+            count > 0 && (
+              <div key={key} style={{ width: `${(count / total) * 100}%`, background: colors[key] ?? '#ccc' }} title={`${labels[key] ?? key}: ${count}`} />
+            ),
+        )}
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 16px' }}>
+        {Object.entries(data).map(
+          ([key, count]) =>
+            count > 0 && (
+              <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5 }}>
+                <span style={{ width: 9, height: 9, borderRadius: 3, background: colors[key] ?? '#ccc', display: 'inline-block' }} />
+                {labels[key] ?? key}: <strong>{count}</strong>
+              </div>
+            ),
+        )}
+      </div>
+    </div>
+  );
 }
 
 function formatCurrency(value: string) {
@@ -79,6 +144,7 @@ const QUICK_ACTIONS: { to: string; label: string; icon: typeof Car; permission: 
 export function Home() {
   const { user, hasPermission } = useAuth();
   const [summary, setSummary] = useState<FinancialSummary | null>(null);
+  const [ops, setOps] = useState<OperationsDashboard | null>(null);
   const [companies, setCompanies] = useState<Company[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -87,6 +153,10 @@ export function Home() {
       api
         .get<FinancialSummary>('/reports/financial-summary')
         .then(setSummary)
+        .catch((err) => setError(err instanceof ApiError ? err.message : null));
+      api
+        .get<OperationsDashboard>('/reports/operations-dashboard')
+        .then(setOps)
         .catch((err) => setError(err instanceof ApiError ? err.message : null));
     }
     if (hasPermission('platform.manage')) {
@@ -191,6 +261,13 @@ export function Home() {
             </div>
           </div>
 
+          {Number(summary.totalPriorEarnings) > 0 && (
+            <p style={{ fontSize: 12, color: 'var(--ink-muted)', marginTop: -10, marginBottom: 16 }}>
+              Do total recebido, {formatCurrency(summary.totalPriorEarnings)} é ganho retroativo informado nos
+              veículos.
+            </p>
+          )}
+
           {summary.chargesByType.length > 0 && (
             <div className="card">
               <strong style={{ display: 'block', marginBottom: 12, fontSize: 13 }}>Lançamentos por tipo</strong>
@@ -205,6 +282,64 @@ export function Home() {
                 ))}
               </div>
             </div>
+          )}
+
+          {ops && (
+            <>
+              {(ops.overdue.count > 0 || ops.maintenanceReminders.length > 0) && (
+                <div className="card" style={{ borderColor: 'var(--rtv-warning)' }}>
+                  <strong style={{ display: 'block', marginBottom: 10, fontSize: 13 }}>Pendências que merecem atenção</strong>
+                  {ops.overdue.count > 0 && (
+                    <p style={{ fontSize: 13, margin: '0 0 8px' }}>
+                      <strong style={{ color: 'var(--rtv-danger)' }}>{ops.overdue.count} pagamento(s) atrasado(s)</strong>, totalizando{' '}
+                      {formatCurrency(ops.overdue.total)}.
+                    </p>
+                  )}
+                  {ops.maintenanceReminders.map((m) => (
+                    <p key={m.vehicleId} style={{ fontSize: 13, margin: '0 0 4px' }}>
+                      <strong>{m.plate}</strong> {m.brand} {m.model} — {m.reason}
+                    </p>
+                  ))}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 16 }}>
+                <div className="card" style={{ flex: '1 1 280px' }}>
+                  <strong style={{ display: 'block', marginBottom: 12, fontSize: 13 }}>Frota por status</strong>
+                  <StatusBarChart data={ops.fleetByStatus} labels={FLEET_STATUS_LABELS} colors={FLEET_STATUS_COLORS} />
+                </div>
+                <div className="card" style={{ flex: '1 1 280px' }}>
+                  <strong style={{ display: 'block', marginBottom: 12, fontSize: 13 }}>Contratos por status</strong>
+                  <StatusBarChart data={ops.contractsByStatus} labels={CONTRACT_STATUS_LABELS} colors={CONTRACT_STATUS_COLORS} />
+                </div>
+              </div>
+
+              {ops.upcomingPayments.length > 0 && (
+                <div className="card">
+                  <strong style={{ display: 'block', marginBottom: 12, fontSize: 13 }}>Próximos pagamentos (14 dias)</strong>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Vencimento</th>
+                        <th>Descrição</th>
+                        <th>Cliente/Veículo</th>
+                        <th>Valor</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {ops.upcomingPayments.map((p) => (
+                        <tr key={p.id}>
+                          <td>{p.dueDate ? formatDateOnly(p.dueDate) : '—'}</td>
+                          <td>{p.description}</td>
+                          <td>{p.customerName ?? p.vehiclePlate ?? '—'}</td>
+                          <td>{formatCurrency(p.amount)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
           )}
 
           {timeline.length > 0 && (

@@ -27,6 +27,11 @@ export class VehiclesController {
     return this.vehiclesService.findAll(actor);
   }
 
+  @Get('fleet-summary')
+  getFleetSummary(@CurrentUser() actor: RequestUser) {
+    return this.vehiclesService.getFleetSummary(actor);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string, @CurrentUser() actor: RequestUser) {
     return this.vehiclesService.findOne(id, actor);

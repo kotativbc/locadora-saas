@@ -4,6 +4,7 @@ import { api, ApiError } from '../api';
 interface FinancialSummary {
   totalReceivable: string;
   totalReceived: string;
+  totalPriorEarnings: string;
   totalExpenses: string;
   balance: string;
   chargesByType: { type: string; count: number; total: string }[];
@@ -60,6 +61,13 @@ export function Reports() {
             <SummaryCard label="Despesas" value={summary.totalExpenses} negative />
             <SummaryCard label="Saldo (recebido − despesas)" value={summary.balance} />
           </div>
+
+          {Number(summary.totalPriorEarnings) > 0 && (
+            <p style={{ fontSize: 12.5, color: 'var(--ink-muted)', marginTop: -8, marginBottom: 16 }}>
+              Do total recebido, {formatCurrency(summary.totalPriorEarnings)} é ganho retroativo (informado
+              manualmente nos veículos, referente a antes de entrarem no sistema).
+            </p>
+          )}
 
           <div className="card" style={{ display: 'flex', gap: 24, marginBottom: 16 }}>
             <div>

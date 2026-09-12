@@ -371,9 +371,9 @@ export function Contracts() {
                         </button>
                       </>
                     )}
-                    {c.status === 'draft' && (
+                    {(c.status === 'draft' || c.status === 'awaiting_signature') && (
                       <button className="logout-btn" style={{ color: 'var(--primary)', borderColor: 'var(--border)' }} onClick={() => handleGenerateLink(c.id)}>
-                        Gerar link
+                        {c.status === 'draft' ? 'Gerar link' : 'Gerar link de novo'}
                       </button>
                     )}
                     {c.status === 'active' && !c.deliveredAt && (

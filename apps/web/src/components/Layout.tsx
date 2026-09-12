@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { NavLink, Link, Outlet, useNavigate } from 'react-router-dom';
 import {
   Building2,
   Car,
@@ -20,6 +20,7 @@ import {
   DatabaseBackup,
   Eye,
   TrendingUp,
+  Home,
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { BrandMark } from './BrandMark';
@@ -58,18 +59,22 @@ export function Layout() {
 
       <aside className={`sidebar${mobileOpen ? ' sidebar--open' : ''}`}>
         <div className="sidebar__brand">
-          <div className="brand-mark">
+          <Link to="/" className="brand-mark" style={{ textDecoration: 'none' }}>
             <BrandMark />
             <span className="brand-mark__word">
               Rent<em>ovix</em>
             </span>
-          </div>
+          </Link>
           <button className="sidebar__close" aria-label="Fechar menu" onClick={() => setMobileOpen(false)}>
             ✕
           </button>
         </div>
 
         <nav className="sidebar__nav" onClick={() => setMobileOpen(false)}>
+          <NavLink to="/" end className={linkClass}>
+            <Home /> Dashboard
+          </NavLink>
+
           {hasPermission('platform.manage') && (
             <>
               <div className="sidebar__section-label">Plataforma</div>

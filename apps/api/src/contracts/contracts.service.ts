@@ -717,8 +717,10 @@ export class ContractsService {
   /** Gera (ou renova) o link público de assinatura de um contrato em rascunho. */
   async createSignatureLink(id: string, actor: RequestUser) {
     const contract = await this.findAndAssertSameCompany(id, actor);
-    if (contract.status !== 'draft') {
-      throw new ConflictException('Só é possível gerar link de assinatura para contratos em rascunho.');
+    if (contract.status !== 'draft' && contract.status !== 'awaiting_signature') {
+      throw new ConflictException(
+        'Só é possível gerar (ou gerar de novo) o link de assinatura antes do contrato ser efetivamente assinado.',
+      );
     }
 
     const token = crypto.randomBytes(32).toString('hex');

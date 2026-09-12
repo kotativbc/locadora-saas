@@ -112,6 +112,66 @@ export class VehiclesService {
     };
   }
 
+  /** Painel agregado de toda a frota — pra tela de Frota mostrar o quadro geral, não só veículo por veículo. */
+  async getFleetSummary(actor: RequestUser) {
+    if (!actor.companyId) {
+      throw new ForbiddenException('Somente usuários de uma empresa podem ver o resumo da frota.');
+    }
+
+    const [vehicleAgg, statusCounts, paidCharges, pendingCharges, expenses] = await Promise.all([
+      this.prisma.vehicle.aggregate({
+        where: { companyId: actor.companyId },
+        _sum: { acquisitionCost: true, fipeValue: true, priorEarnings: true },
+        _count: true,
+      }),
+      this.prisma.vehicle.groupBy({
+        by: ['status'],
+        where: { companyId: actor.companyId },
+        _count: true,
+      }),
+      this.prisma.charge.aggregate({
+        where: { companyId: actor.companyId, status: 'paid' },
+        _sum: { amount: true },
+      }),
+      this.prisma.charge.aggregate({
+        where: { companyId: actor.companyId, status: 'pending' },
+        _sum: { amount: true },
+      }),
+      this.prisma.expense.aggregate({
+        where: { companyId: actor.companyId },
+        _sum: { amount: true },
+      }),
+    ]);
+
+    const totalAcquisitionCost = Number(vehicleAgg._sum.acquisitionCost ?? 0);
+    const totalFipeValue = Number(vehicleAgg._sum.fipeValue ?? 0);
+    const totalPriorEarnings = Number(vehicleAgg._sum.priorEarnings ?? 0);
+    const totalReceivedFromCharges = Number(paidCharges._sum.amount ?? 0);
+    const totalReceived = totalReceivedFromCharges + totalPriorEarnings;
+    const totalPending = Number(pendingCharges._sum.amount ?? 0);
+    const totalExpenses = Number(expenses._sum.amount ?? 0);
+    const netResult = totalReceived - totalExpenses;
+
+    const byStatus: Record<string, number> = { available: 0, rented: 0, maintenance: 0, inactive: 0 };
+    for (const row of statusCounts as { status: string; _count: number }[]) {
+      byStatus[row.status] = row._count;
+    }
+
+    return {
+      totalVehicles: vehicleAgg._count,
+      byStatus,
+      totalAcquisitionCost: totalAcquisitionCost.toFixed(2),
+      totalFipeValue: totalFipeValue.toFixed(2),
+      totalPriorEarnings: totalPriorEarnings.toFixed(2),
+      totalReceived: totalReceived.toFixed(2),
+      totalPending: totalPending.toFixed(2),
+      totalExpenses: totalExpenses.toFixed(2),
+      netResult: netResult.toFixed(2),
+      fleetPaybackProgress:
+        totalAcquisitionCost > 0 ? Math.min(100, (netResult / totalAcquisitionCost) * 100).toFixed(1) : null,
+    };
+  }
+
   private async findAndAssertSameCompany(id: string, actor: RequestUser) {
     const vehicle = await this.prisma.vehicle.findUnique({ where: { id } });
     if (!vehicle) {

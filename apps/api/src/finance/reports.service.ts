@@ -11,6 +11,7 @@ export class ReportsService {
       return {
         totalReceivable: '0.00',
         totalReceived: '0.00',
+        totalPriorEarnings: '0.00',
         totalExpenses: '0.00',
         balance: '0.00',
         chargesByType: [],
@@ -21,7 +22,7 @@ export class ReportsService {
       };
     }
 
-    const [pendingCharges, paidCharges, expenses, chargesByType, fleetSize, activeContracts, recentCharges, recentExpenses] =
+    const [pendingCharges, paidCharges, expenses, priorEarningsAgg, chargesByType, fleetSize, activeContracts, recentCharges, recentExpenses] =
       await Promise.all([
         this.prisma.charge.aggregate({
           where: { companyId: actor.companyId, status: 'pending' },
@@ -34,6 +35,10 @@ export class ReportsService {
         this.prisma.expense.aggregate({
           where: { companyId: actor.companyId },
           _sum: { amount: true },
+        }),
+        this.prisma.vehicle.aggregate({
+          where: { companyId: actor.companyId },
+          _sum: { priorEarnings: true },
         }),
         this.prisma.charge.groupBy({
           by: ['type'],
@@ -61,12 +66,15 @@ export class ReportsService {
       ]);
 
     const totalReceivable = Number(pendingCharges._sum.amount ?? 0);
-    const totalReceived = Number(paidCharges._sum.amount ?? 0);
+    const totalReceivedFromCharges = Number(paidCharges._sum.amount ?? 0);
+    const totalPriorEarnings = Number(priorEarningsAgg._sum.priorEarnings ?? 0);
+    const totalReceived = totalReceivedFromCharges + totalPriorEarnings; // ganho retroativo entra como recebido, igual no painel do veículo
     const totalExpenses = Number(expenses._sum.amount ?? 0);
 
     return {
       totalReceivable: totalReceivable.toFixed(2),
       totalReceived: totalReceived.toFixed(2),
+      totalPriorEarnings: totalPriorEarnings.toFixed(2),
       totalExpenses: totalExpenses.toFixed(2),
       balance: (totalReceived - totalExpenses).toFixed(2),
       chargesByType: chargesByType.map((c: { type: string; _count: number; _sum: { amount: unknown } }) => ({
@@ -113,6 +121,116 @@ export class ReportsService {
       })),
       fleetSize,
       activeContracts,
+    };
+  }
+
+  /** Painel operacional completo — visão geral de toda a operação, não só financeiro. */
+  async getOperationsDashboard(actor: RequestUser) {
+    if (!actor.companyId) {
+      return {
+        fleetByStatus: { available: 0, rented: 0, maintenance: 0, inactive: 0 },
+        contractsByStatus: { draft: 0, awaiting_signature: 0, active: 0, completed: 0, cancelled: 0 },
+        upcomingPayments: [],
+        overdue: { count: 0, total: '0.00' },
+        maintenanceReminders: [],
+      };
+    }
+
+    const now = new Date();
+    const in14Days = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
+
+    const [fleetStatusRows, contractStatusRows, upcomingChargesRaw, overdueAgg] = await Promise.all([
+      this.prisma.vehicle.groupBy({ by: ['status'], where: { companyId: actor.companyId }, _count: true }),
+      this.prisma.contract.groupBy({ by: ['status'], where: { companyId: actor.companyId }, _count: true }),
+      this.prisma.charge.findMany({
+        where: { companyId: actor.companyId, status: 'pending', dueDate: { gte: now, lte: in14Days } },
+        orderBy: { dueDate: 'asc' },
+        take: 10,
+        include: {
+          customer: { select: { name: true } },
+          contract: { select: { vehicle: { select: { plate: true } } } },
+        },
+      }),
+      this.prisma.charge.aggregate({
+        where: { companyId: actor.companyId, status: 'pending', dueDate: { lt: now } },
+        _sum: { amount: true },
+        _count: true,
+      }),
+    ]);
+
+    const fleetByStatus: Record<string, number> = { available: 0, rented: 0, maintenance: 0, inactive: 0 };
+    for (const row of fleetStatusRows as { status: string; _count: number }[]) {
+      fleetByStatus[row.status] = row._count;
+    }
+
+    const contractsByStatus: Record<string, number> = {
+      draft: 0,
+      awaiting_signature: 0,
+      active: 0,
+      completed: 0,
+      cancelled: 0,
+    };
+    for (const row of contractStatusRows as { status: string; _count: number }[]) {
+      contractsByStatus[row.status] = row._count;
+    }
+
+    const upcomingPayments = upcomingChargesRaw.map(
+      (c: {
+        id: string;
+        description: string;
+        amount: { toString(): string };
+        dueDate: Date | null;
+        customer: { name: string } | null;
+        contract: { vehicle: { plate: string } } | null;
+      }) => ({
+        id: c.id,
+        description: c.description,
+        amount: c.amount.toString(),
+        dueDate: c.dueDate,
+        customerName: c.customer?.name ?? null,
+        vehiclePlate: c.contract?.vehicle?.plate ?? null,
+      }),
+    );
+
+    // Manutenção preventiva próxima do vencimento — comparado por km, direto dos registros
+    // de manutenção mais recentes de cada veículo (nextDueKm), sem precisar de campo derivado.
+    const lastMaintenancePerVehicle = await this.prisma.maintenance.findMany({
+      where: { companyId: actor.companyId, nextDueKm: { not: null } },
+      orderBy: { performedAt: 'desc' },
+      select: { vehicleId: true, nextDueKm: true, nextDueDate: true, vehicle: { select: { plate: true, brand: true, model: true, odometerKm: true } } },
+    });
+    const seenVehicles = new Set<string>();
+    const maintenanceReminders: { vehicleId: string; plate: string; brand: string; model: string; reason: string }[] = [];
+    for (const m of lastMaintenancePerVehicle) {
+      if (seenVehicles.has(m.vehicleId)) continue; // já pegamos o registro mais recente desse veículo
+      seenVehicles.add(m.vehicleId);
+      const kmRemaining = m.nextDueKm !== null ? m.nextDueKm - m.vehicle.odometerKm : null;
+      const dateSoon = m.nextDueDate && m.nextDueDate.getTime() - now.getTime() < 14 * 24 * 60 * 60 * 1000;
+      if ((kmRemaining !== null && kmRemaining <= 1000) || dateSoon) {
+        maintenanceReminders.push({
+          vehicleId: m.vehicleId,
+          plate: m.vehicle.plate,
+          brand: m.vehicle.brand,
+          model: m.vehicle.model,
+          reason:
+            kmRemaining !== null && kmRemaining <= 1000
+              ? kmRemaining <= 0
+                ? `${Math.abs(kmRemaining)} km além do previsto pra próxima revisão`
+                : `faltam ${kmRemaining} km pra próxima revisão`
+              : 'revisão prevista pra breve',
+        });
+      }
+    }
+
+    return {
+      fleetByStatus,
+      contractsByStatus,
+      upcomingPayments,
+      overdue: {
+        count: overdueAgg._count,
+        total: Number(overdueAgg._sum.amount ?? 0).toFixed(2),
+      },
+      maintenanceReminders: maintenanceReminders.slice(0, 10),
     };
   }
 

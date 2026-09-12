@@ -23,6 +23,19 @@ interface Vehicle {
   createdAt: string;
 }
 
+interface FleetSummary {
+  totalVehicles: number;
+  byStatus: Record<string, number>;
+  totalAcquisitionCost: string;
+  totalFipeValue: string;
+  totalPriorEarnings: string;
+  totalReceived: string;
+  totalPending: string;
+  totalExpenses: string;
+  netResult: string;
+  fleetPaybackProgress: string | null;
+}
+
 const STATUS_OPTIONS: StatusOption[] = [
   { value: 'available', label: 'Disponível', variant: 'success' },
   { value: 'rented', label: 'Locado', variant: 'info' },
@@ -32,6 +45,7 @@ const STATUS_OPTIONS: StatusOption[] = [
 
 export function Fleet() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [fleetSummary, setFleetSummary] = useState<FleetSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -42,7 +56,12 @@ export function Fleet() {
   async function load() {
     setLoading(true);
     try {
-      setVehicles(await api.get<Vehicle[]>('/vehicles'));
+      const [v, s] = await Promise.all([
+        api.get<Vehicle[]>('/vehicles'),
+        api.get<FleetSummary>('/vehicles/fleet-summary'),
+      ]);
+      setVehicles(v);
+      setFleetSummary(s);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Erro ao carregar a frota.');
     } finally {
@@ -80,6 +99,61 @@ export function Fleet() {
         circulação por completo). Se um veículo específico está livre numa data, isso é decidido pela agenda de
         contratos — não precisa marcar "Locado" manualmente.
       </p>
+
+      {fleetSummary && (
+        <div className="card">
+          <strong style={{ display: 'block', marginBottom: 12 }}>Visão geral da frota</strong>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 14 }}>
+            <div>
+              <div style={{ fontSize: 11.5, color: 'var(--ink-muted)' }}>Veículos</div>
+              <div style={{ fontSize: 19, fontWeight: 700 }}>{fleetSummary.totalVehicles}</div>
+              <div style={{ fontSize: 11, color: 'var(--ink-muted)' }}>
+                {fleetSummary.byStatus.available ?? 0} disponíveis · {fleetSummary.byStatus.rented ?? 0} locados ·{' '}
+                {fleetSummary.byStatus.maintenance ?? 0} em manutenção · {fleetSummary.byStatus.inactive ?? 0} inativos
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11.5, color: 'var(--ink-muted)' }}>Já gasto (frota toda)</div>
+              <div style={{ fontSize: 19, fontWeight: 700, color: 'var(--rtv-danger)' }}>{formatCurrency(fleetSummary.totalExpenses)}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11.5, color: 'var(--ink-muted)' }}>Já recebido (frota toda)</div>
+              <div style={{ fontSize: 19, fontWeight: 700, color: 'var(--rtv-success)' }}>{formatCurrency(fleetSummary.totalReceived)}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11.5, color: 'var(--ink-muted)' }}>Resultado líquido</div>
+              <div style={{ fontSize: 19, fontWeight: 700, color: Number(fleetSummary.netResult) >= 0 ? 'var(--rtv-success)' : 'var(--rtv-danger)' }}>
+                {formatCurrency(fleetSummary.netResult)}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11.5, color: 'var(--ink-muted)' }}>Custo total de aquisição</div>
+              <div style={{ fontSize: 19, fontWeight: 700 }}>{formatCurrency(fleetSummary.totalAcquisitionCost)}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11.5, color: 'var(--ink-muted)' }}>Valor total (Tabela FIPE)</div>
+              <div style={{ fontSize: 19, fontWeight: 700 }}>{formatCurrency(fleetSummary.totalFipeValue)}</div>
+            </div>
+          </div>
+          {fleetSummary.fleetPaybackProgress !== null ? (
+            <p style={{ fontSize: 13, margin: 0 }}>
+              A frota já se pagou em <strong>{fleetSummary.fleetPaybackProgress}%</strong> do que custou pra
+              adquirir (recebido menos despesas, comparado com o custo total de aquisição).
+            </p>
+          ) : (
+            <p style={{ fontSize: 12.5, color: 'var(--ink-muted)', margin: 0 }}>
+              Cadastre o "custo de aquisição" nos veículos (botão Editar) pra ver o percentual de retorno da frota
+              como um todo.
+            </p>
+          )}
+          {Number(fleetSummary.totalPriorEarnings) > 0 && (
+            <p style={{ fontSize: 12, color: 'var(--ink-muted)', marginTop: 8, marginBottom: 0 }}>
+              Do total recebido, {formatCurrency(fleetSummary.totalPriorEarnings)} é ganho retroativo somado de
+              todos os veículos.
+            </p>
+          )}
+        </div>
+      )}
 
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
