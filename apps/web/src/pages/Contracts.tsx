@@ -1,4 +1,5 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { api, ApiError, fetchFileUrl, copyToClipboard } from '../api';
 import { formatDateOnly } from '../dateUtils';
 import { StatusBadge, type BadgeVariant } from '../components/StatusBadge';
@@ -94,6 +95,23 @@ export function Contracts() {
   const [invoiceSentMessage, setInvoiceSentMessage] = useState<string | null>(null);
   const [editDraftTarget, setEditDraftTarget] = useState<Contract | null>(null);
   const [editOperationalTarget, setEditOperationalTarget] = useState<Contract | null>(null);
+
+  // Vindo de um clique de "Pendências" no Dashboard (?highlight=id) — realça a linha certa.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const highlightId = searchParams.get('highlight');
+  const highlightedRowRef = useRef<HTMLTableRowElement | null>(null);
+
+  useEffect(() => {
+    if (highlightId && highlightedRowRef.current) {
+      highlightedRowRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const timer = setTimeout(() => {
+        searchParams.delete('highlight');
+        setSearchParams(searchParams, { replace: true });
+      }, 2500);
+      return () => clearTimeout(timer);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [highlightId, contracts]);
 
   async function load() {
     setLoading(true);
@@ -331,7 +349,11 @@ export function Contracts() {
             </thead>
             <tbody>
               {contracts.map((c) => (
-                <tr key={c.id}>
+                <tr
+                  key={c.id}
+                  ref={c.id === highlightId ? highlightedRowRef : undefined}
+                  className={c.id === highlightId ? 'rtv-row-highlight' : undefined}
+                >
                   <td>{c.number ?? '—'}</td>
                   <td>{c.customer.name}</td>
                   <td>

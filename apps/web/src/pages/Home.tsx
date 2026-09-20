@@ -35,6 +35,7 @@ interface FinancialSummary {
   totalReceivable: string;
   totalReceived: string;
   totalPriorEarnings: string;
+  totalVehicleSales: string;
   totalExpenses: string;
   balance: string;
   chargesByType: ChargeByType[];
@@ -55,6 +56,16 @@ interface OperationsDashboard {
   upcomingPayments: { id: string; description: string; amount: string; dueDate: string | null; customerName: string | null; vehiclePlate: string | null }[];
   overdue: { count: number; total: string };
   maintenanceReminders: { vehicleId: string; plate: string; brand: string; model: string; reason: string }[];
+}
+
+interface PendencyItem {
+  id: string;
+  type: 'charge_overdue' | 'contract_signature' | 'maintenance_due' | 'maintenance_report';
+  severity: 'critical' | 'warning';
+  title: string;
+  description: string;
+  link: string;
+  date: string | null;
 }
 
 const FLEET_STATUS_LABELS: Record<string, string> = {
@@ -145,6 +156,7 @@ export function Home() {
   const { user, hasPermission } = useAuth();
   const [summary, setSummary] = useState<FinancialSummary | null>(null);
   const [ops, setOps] = useState<OperationsDashboard | null>(null);
+  const [pendencies, setPendencies] = useState<PendencyItem[] | null>(null);
   const [companies, setCompanies] = useState<Company[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -157,6 +169,10 @@ export function Home() {
       api
         .get<OperationsDashboard>('/reports/operations-dashboard')
         .then(setOps)
+        .catch((err) => setError(err instanceof ApiError ? err.message : null));
+      api
+        .get<PendencyItem[]>('/reports/pendencies')
+        .then(setPendencies)
         .catch((err) => setError(err instanceof ApiError ? err.message : null));
     }
     if (hasPermission('platform.manage')) {
@@ -262,9 +278,14 @@ export function Home() {
           </div>
 
           {Number(summary.totalPriorEarnings) > 0 && (
-            <p style={{ fontSize: 12, color: 'var(--ink-muted)', marginTop: -10, marginBottom: 16 }}>
+            <p style={{ fontSize: 12, color: 'var(--ink-muted)', marginTop: -10, marginBottom: 8 }}>
               Do total recebido, {formatCurrency(summary.totalPriorEarnings)} é ganho retroativo informado nos
               veículos.
+            </p>
+          )}
+          {Number(summary.totalVehicleSales) > 0 && (
+            <p style={{ fontSize: 12, color: 'var(--ink-muted)', marginTop: -4, marginBottom: 16 }}>
+              Do total recebido, {formatCurrency(summary.totalVehicleSales)} vem de venda de veículos.
             </p>
           )}
 
@@ -284,25 +305,54 @@ export function Home() {
             </div>
           )}
 
+          {pendencies && pendencies.length > 0 && (
+            <div className="card" style={{ borderColor: 'var(--rtv-danger)' }}>
+              <strong style={{ display: 'block', marginBottom: 10, fontSize: 13 }}>
+                Pendências que precisam de atenção ({pendencies.length})
+              </strong>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {pendencies.map((p) => (
+                  <Link
+                    key={p.id}
+                    to={p.link}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: 10,
+                      padding: '8px 6px',
+                      borderRadius: 6,
+                      textDecoration: 'none',
+                      color: 'inherit',
+                      borderLeft: `3px solid ${p.severity === 'critical' ? 'var(--rtv-danger)' : 'var(--rtv-warning)'}`,
+                    }}
+                    className="pendency-row"
+                  >
+                    <span
+                      style={{
+                        marginTop: 2,
+                        fontSize: 10,
+                        fontWeight: 700,
+                        textTransform: 'uppercase',
+                        letterSpacing: 0.3,
+                        color: p.severity === 'critical' ? 'var(--rtv-danger)' : 'var(--rtv-warning)',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {p.severity === 'critical' ? 'Urgente' : 'Atenção'}
+                    </span>
+                    <span style={{ fontSize: 13 }}>
+                      <strong>{p.title}</strong>
+                      <br />
+                      <span style={{ color: 'var(--ink-muted)' }}>{p.description}</span>
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+
           {ops && (
             <>
-              {(ops.overdue.count > 0 || ops.maintenanceReminders.length > 0) && (
-                <div className="card" style={{ borderColor: 'var(--rtv-warning)' }}>
-                  <strong style={{ display: 'block', marginBottom: 10, fontSize: 13 }}>Pendências que merecem atenção</strong>
-                  {ops.overdue.count > 0 && (
-                    <p style={{ fontSize: 13, margin: '0 0 8px' }}>
-                      <strong style={{ color: 'var(--rtv-danger)' }}>{ops.overdue.count} pagamento(s) atrasado(s)</strong>, totalizando{' '}
-                      {formatCurrency(ops.overdue.total)}.
-                    </p>
-                  )}
-                  {ops.maintenanceReminders.map((m) => (
-                    <p key={m.vehicleId} style={{ fontSize: 13, margin: '0 0 4px' }}>
-                      <strong>{m.plate}</strong> {m.brand} {m.model} — {m.reason}
-                    </p>
-                  ))}
-                </div>
-              )}
-
               <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 16 }}>
                 <div className="card" style={{ flex: '1 1 280px' }}>
                   <strong style={{ display: 'block', marginBottom: 12, fontSize: 13 }}>Frota por status</strong>

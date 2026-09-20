@@ -83,7 +83,9 @@ export class ChargesService {
         amount: dto.amount,
         dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
         status: dto.status,
-        paidAt: dto.status === 'paid' ? new Date() : dto.status === 'pending' ? null : undefined,
+        // 'pending' e 'atrasado' são a mesma coisa pra fins de pagamento (ainda não pago) —
+        // atrasado só marca que já passou do vencimento, então paidAt some nos dois casos.
+        paidAt: dto.status === 'paid' ? new Date() : dto.status === 'pending' || dto.status === 'atrasado' ? null : undefined,
       },
     });
 

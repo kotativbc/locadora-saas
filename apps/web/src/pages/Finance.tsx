@@ -1,4 +1,5 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { api, ApiError } from '../api';
 import { formatDateOnly } from '../dateUtils';
 import { StatusSelect, type StatusOption } from '../components/StatusSelect';
@@ -25,8 +26,14 @@ const TYPE_LABELS: Record<string, string> = {
 
 const STATUS_OPTIONS: StatusOption[] = [
   { value: 'pending', label: 'Pendente', variant: 'warning' },
+  { value: 'atrasado', label: 'Atrasado', variant: 'danger' },
   { value: 'paid', label: 'Pago', variant: 'success' },
-  { value: 'cancelled', label: 'Cancelado', variant: 'danger' },
+  { value: 'cancelled', label: 'Cancelado', variant: 'neutral' },
+];
+
+const STATUS_FILTER_OPTIONS: { value: string; label: string }[] = [
+  { value: 'all', label: 'Todos os status' },
+  ...STATUS_OPTIONS.map((o) => ({ value: o.value, label: o.label })),
 ];
 
 function formatCurrency(value: string) {
@@ -55,6 +62,49 @@ export function Finance() {
   const [formOpen, setFormOpen] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [editTarget, setEditTarget] = useState<Charge | null>(null);
+
+  // Filtros
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [dueFrom, setDueFrom] = useState('');
+  const [dueTo, setDueTo] = useState('');
+
+  // Vindo de um clique de "Pendências" no Dashboard (?highlight=id) — realça a linha certa.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const highlightId = searchParams.get('highlight');
+  const highlightedRowRef = useRef<HTMLTableRowElement | null>(null);
+
+  useEffect(() => {
+    if (highlightId && highlightedRowRef.current) {
+      highlightedRowRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const timer = setTimeout(() => {
+        searchParams.delete('highlight');
+        setSearchParams(searchParams, { replace: true });
+      }, 2500);
+      return () => clearTimeout(timer);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [highlightId, charges]);
+
+  const filteredCharges = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return charges.filter((c) => {
+      if (statusFilter !== 'all' && c.status !== statusFilter) return false;
+      if (term && !`${c.description} ${c.customer?.name ?? ''}`.toLowerCase().includes(term)) return false;
+      if (dueFrom && (!c.dueDate || c.dueDate.slice(0, 10) < dueFrom)) return false;
+      if (dueTo && (!c.dueDate || c.dueDate.slice(0, 10) > dueTo)) return false;
+      return true;
+    });
+  }, [charges, search, statusFilter, dueFrom, dueTo]);
+
+  const hasActiveFilters = search.trim() !== '' || statusFilter !== 'all' || dueFrom !== '' || dueTo !== '';
+
+  function clearFilters() {
+    setSearch('');
+    setStatusFilter('all');
+    setDueFrom('');
+    setDueTo('');
+  }
 
   async function load() {
     setLoading(true);
@@ -122,16 +172,67 @@ export function Finance() {
 
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <strong>{charges.length} lançamento(s)</strong>
+          <strong>
+            {filteredCharges.length} lançamento(s){hasActiveFilters && charges.length !== filteredCharges.length ? ` de ${charges.length}` : ''}
+          </strong>
           <button className="btn btn--accent" onClick={() => setFormOpen((v) => !v)}>
             {formOpen ? 'Cancelar' : '+ Lançamento manual'}
           </button>
         </div>
 
+        {charges.length > 0 && (
+          <div
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: 10,
+              alignItems: 'flex-end',
+              marginBottom: 16,
+              paddingBottom: 16,
+              borderBottom: '1px solid var(--rtv-line)',
+            }}
+          >
+            <div className="field" style={{ marginBottom: 0, flex: '1 1 220px' }}>
+              <label>Buscar</label>
+              <input
+                type="text"
+                placeholder="Descrição ou cliente..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>Status</label>
+              <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                {STATUS_FILTER_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>Vencimento de</label>
+              <input type="date" value={dueFrom} onChange={(e) => setDueFrom(e.target.value)} />
+            </div>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>até</label>
+              <input type="date" value={dueTo} onChange={(e) => setDueTo(e.target.value)} />
+            </div>
+            {hasActiveFilters && (
+              <button type="button" className="logout-btn" style={{ color: 'var(--ink-muted)', borderColor: 'var(--border)' }} onClick={clearFilters}>
+                Limpar filtros
+              </button>
+            )}
+          </div>
+        )}
+
         {loading ? (
           <p>Carregando...</p>
         ) : charges.length === 0 ? (
           <EmptyState title="Nenhum lançamento ainda" body="Lançamentos de aluguel, avaria e multa aparecem aqui automaticamente." />
+        ) : filteredCharges.length === 0 ? (
+          <EmptyState title="Nenhum lançamento encontrado" body="Nenhum lançamento bate com os filtros aplicados." />
         ) : (
           <table>
             <thead>
@@ -146,8 +247,8 @@ export function Finance() {
               </tr>
             </thead>
             <tbody>
-              {charges.map((c) => (
-                <tr key={c.id}>
+              {filteredCharges.map((c) => (
+                <tr key={c.id} ref={c.id === highlightId ? highlightedRowRef : undefined} className={c.id === highlightId ? 'rtv-row-highlight' : undefined}>
                   <td>{TYPE_LABELS[c.type] ?? c.type}</td>
                   <td>{c.description}</td>
                   <td>{c.customer?.name ?? '—'}</td>
@@ -325,7 +426,9 @@ function EditChargeForm({
   const [description, setDescription] = useState(charge.description);
   const [amount, setAmount] = useState(charge.amount);
   const [dueDate, setDueDate] = useState(charge.dueDate ? charge.dueDate.slice(0, 10) : '');
-  const [status, setStatus] = useState<'pending' | 'paid' | 'cancelled'>(charge.status as 'pending' | 'paid' | 'cancelled');
+  const [status, setStatus] = useState<'pending' | 'atrasado' | 'paid' | 'cancelled'>(
+    charge.status as 'pending' | 'atrasado' | 'paid' | 'cancelled',
+  );
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -378,6 +481,7 @@ function EditChargeForm({
         <label>Status</label>
         <select value={status} onChange={(e) => setStatus(e.target.value as typeof status)}>
           <option value="pending">Pendente</option>
+          <option value="atrasado">Atrasado</option>
           <option value="paid">Pago</option>
           <option value="cancelled">Cancelado</option>
         </select>

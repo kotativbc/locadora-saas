@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import { PrismaClient } from '@prisma/client';
+import { saoPauloTodayUTC } from './common/date.util';
 
 /**
  * Executado periodicamente por um systemd timer (ex: a cada 1 minuto).
@@ -24,6 +25,18 @@ async function run() {
   const prisma = new PrismaClient();
 
   try {
+    // Cobrança "pending" cujo vencimento já passou (calendário de São Paulo) vira "atrasado"
+    // automaticamente — roda a cada execução do worker (a cada 1 min), então o atraso aparece
+    // quase em tempo real, sem precisar de ninguém marcar nada manualmente.
+    const today = saoPauloTodayUTC();
+    const overdueSweep = await prisma.charge.updateMany({
+      where: { status: 'pending', dueDate: { lt: today } },
+      data: { status: 'atrasado' },
+    });
+    if (overdueSweep.count > 0) {
+      console.log(`[worker] ${overdueSweep.count} cobrança(s) marcada(s) como atrasada(s).`);
+    }
+
     const pendingJobs = await prisma.job.findMany({
       where: { status: 'pending', runAfter: { lte: new Date() } },
       orderBy: { createdAt: 'asc' },

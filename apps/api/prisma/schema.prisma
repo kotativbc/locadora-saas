@@ -263,7 +263,9 @@ model Vehicle {
   manufactureYear Int?
   color           String?
   category        String // texto livre por enquanto: economico, sedan, suv, van, luxo...
-  status          String   @default("available") // available | rented | maintenance | inactive
+  status          String   @default("available") // available | rented | maintenance | inactive | sold
+  soldAt          DateTime? // preenchido só quando vendido — junto com salePrice
+  salePrice       Decimal? @db.Decimal(10, 2)
   odometerKm      Int      @default(0)
   fuelType        String? // flex, gasolina, diesel, eletrico, hibrido
   fipeValue       Decimal? @db.Decimal(10, 2) // base pra multas indenizatórias calculadas em % da FIPE
@@ -687,7 +689,7 @@ model Charge {
   type            String // rental | damage | fine | other
   description     String
   amount          Decimal   @db.Decimal(10, 2)
-  status          String    @default("pending") // pending | paid | cancelled
+  status          String    @default("pending") // pending | atrasado | paid | cancelled
   dueDate         DateTime?
   paidAt          DateTime?
   createdByUserId String?

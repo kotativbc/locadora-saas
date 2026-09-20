@@ -14,6 +14,7 @@ import { PlatformGrowthReport } from './pages/PlatformGrowthReport';
 import { MyCompany } from './pages/MyCompany';
 import { Users } from './pages/Users';
 import { Fleet } from './pages/Fleet';
+import { VehicleSales } from './pages/VehicleSales';
 import { Customers } from './pages/Customers';
 import { Rates } from './pages/Rates';
 import { Contracts } from './pages/Contracts';
@@ -52,6 +53,7 @@ export function App() {
               <Route path="/minha-empresa" element={<MyCompany />} />
               <Route path="/usuarios" element={<Users />} />
               <Route path="/frota" element={<Fleet />} />
+              <Route path="/vendas-de-veiculos" element={<VehicleSales />} />
               <Route path="/clientes" element={<Customers />} />
               <Route path="/tarifas" element={<Rates />} />
               <Route path="/contratos" element={<Contracts />} />

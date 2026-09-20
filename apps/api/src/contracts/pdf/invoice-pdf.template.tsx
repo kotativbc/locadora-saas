@@ -6,6 +6,7 @@ const MUTED = '#6b7280';
 const BORDER = '#e2e5ea';
 const SUCCESS = '#1a7f4b';
 const WARNING = '#b3432e';
+const DANGER = '#a11d1d';
 
 const styles = StyleSheet.create({
   page: { padding: 0, fontSize: 9.5, fontFamily: 'Helvetica', color: '#1a1a1a' },
@@ -49,6 +50,7 @@ const styles = StyleSheet.create({
   colAmount: { width: '13%', textAlign: 'right' },
   statusPaid: { color: SUCCESS, fontFamily: 'Helvetica-Bold', fontSize: 8.5 },
   statusPending: { color: WARNING, fontFamily: 'Helvetica-Bold', fontSize: 8.5 },
+  statusOverdue: { color: DANGER, fontFamily: 'Helvetica-Bold', fontSize: 8.5 },
   statusCancelled: { color: MUTED, fontFamily: 'Helvetica-Bold', fontSize: 8.5 },
   totalsBox: { alignItems: 'flex-end', marginBottom: 28 },
   totalsRow: { flexDirection: 'row', width: 220, justifyContent: 'space-between', paddingVertical: 3 },
@@ -154,6 +156,7 @@ const TYPE_LABELS: Record<string, string> = {
 const STATUS_LABELS: Record<string, string> = {
   paid: 'Pago',
   pending: 'Pendente',
+  atrasado: 'Atrasado',
   cancelled: 'Cancelado',
 };
 
@@ -169,7 +172,8 @@ export function InvoicePdfDocument({
   const companyLabel = company.tradeName ?? company.name;
   const totalPaid = charges.filter((c) => c.status === 'paid').reduce((sum, c) => sum + Number(c.amount), 0);
   const totalPending = charges
-    .filter((c) => c.status === 'pending')
+    // 'atrasado' ainda é valor em aberto, só que vencido — entra na mesma soma de pendente.
+    .filter((c) => c.status === 'pending' || c.status === 'atrasado')
     .reduce((sum, c) => sum + Number(c.amount), 0);
   const totalCancelled = charges
     .filter((c) => c.status === 'cancelled')
@@ -177,7 +181,13 @@ export function InvoicePdfDocument({
   const grandTotal = totalPaid + totalPending;
 
   const statusStyle = (status: string) =>
-    status === 'paid' ? styles.statusPaid : status === 'cancelled' ? styles.statusCancelled : styles.statusPending;
+    status === 'paid'
+      ? styles.statusPaid
+      : status === 'cancelled'
+        ? styles.statusCancelled
+        : status === 'atrasado'
+          ? styles.statusOverdue
+          : styles.statusPending;
 
   return (
     <Document>

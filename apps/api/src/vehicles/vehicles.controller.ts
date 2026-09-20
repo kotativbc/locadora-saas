@@ -1,8 +1,9 @@
-import { Body, Controller, Get, Param, Patch, Post, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { VehiclesService } from './vehicles.service';
 import { CreateVehicleDto } from './dto/create-vehicle.dto';
 import { UpdateVehicleDto } from './dto/update-vehicle.dto';
+import { MarkVehicleSoldDto } from './dto/mark-vehicle-sold.dto';
 import { DocumentsService, MAX_DOCUMENT_BYTES } from '../documents/documents.service';
 import { RequirePermissions } from '../rbac/permissions.decorator';
 import { PermissionCode } from '../rbac/rbac.constants';
@@ -32,6 +33,11 @@ export class VehiclesController {
     return this.vehiclesService.getFleetSummary(actor);
   }
 
+  @Get('sold')
+  findSold(@CurrentUser() actor: RequestUser) {
+    return this.vehiclesService.findSold(actor);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string, @CurrentUser() actor: RequestUser) {
     return this.vehiclesService.findOne(id, actor);
@@ -40,6 +46,16 @@ export class VehiclesController {
   @Patch(':id')
   update(@Param('id') id: string, @Body() dto: UpdateVehicleDto, @CurrentUser() actor: RequestUser) {
     return this.vehiclesService.update(id, dto, actor);
+  }
+
+  @Post(':id/sell')
+  markAsSold(@Param('id') id: string, @Body() dto: MarkVehicleSoldDto, @CurrentUser() actor: RequestUser) {
+    return this.vehiclesService.markAsSold(id, dto.salePrice, actor);
+  }
+
+  @Delete(':id')
+  remove(@Param('id') id: string, @CurrentUser() actor: RequestUser) {
+    return this.vehiclesService.remove(id, actor);
   }
 
   @Get(':id/financial-summary')

@@ -5,6 +5,7 @@ interface FinancialSummary {
   totalReceivable: string;
   totalReceived: string;
   totalPriorEarnings: string;
+  totalVehicleSales: string;
   totalExpenses: string;
   balance: string;
   chargesByType: { type: string; count: number; total: string }[];
@@ -63,9 +64,15 @@ export function Reports() {
           </div>
 
           {Number(summary.totalPriorEarnings) > 0 && (
-            <p style={{ fontSize: 12.5, color: 'var(--ink-muted)', marginTop: -8, marginBottom: 16 }}>
+            <p style={{ fontSize: 12.5, color: 'var(--ink-muted)', marginTop: -8, marginBottom: 8 }}>
               Do total recebido, {formatCurrency(summary.totalPriorEarnings)} é ganho retroativo (informado
               manualmente nos veículos, referente a antes de entrarem no sistema).
+            </p>
+          )}
+          {Number(summary.totalVehicleSales) > 0 && (
+            <p style={{ fontSize: 12.5, color: 'var(--ink-muted)', marginTop: -4, marginBottom: 16 }}>
+              Do total recebido, {formatCurrency(summary.totalVehicleSales)} vem da venda de veículos que saíram
+              da frota.
             </p>
           )}
 

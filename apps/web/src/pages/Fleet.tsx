@@ -1,4 +1,5 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { api, ApiError } from '../api';
 import { StatusSelect, type StatusOption } from '../components/StatusSelect';
 import { EmptyState } from '../components/EmptyState';
@@ -52,6 +53,24 @@ export function Fleet() {
   const [savingId, setSavingId] = useState<string | null>(null);
   const [editTarget, setEditTarget] = useState<Vehicle | null>(null);
   const [financialTarget, setFinancialTarget] = useState<Vehicle | null>(null);
+  const [saleTarget, setSaleTarget] = useState<Vehicle | null>(null);
+
+  // Vindo de um clique de "Pendências" no Dashboard (?highlight=id) — realça a linha certa.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const highlightId = searchParams.get('highlight');
+  const highlightedRowRef = useRef<HTMLTableRowElement | null>(null);
+
+  useEffect(() => {
+    if (highlightId && highlightedRowRef.current) {
+      highlightedRowRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const timer = setTimeout(() => {
+        searchParams.delete('highlight');
+        setSearchParams(searchParams, { replace: true });
+      }, 2500);
+      return () => clearTimeout(timer);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [highlightId, vehicles]);
 
   async function load() {
     setLoading(true);
@@ -83,6 +102,23 @@ export function Fleet() {
       setError(err instanceof ApiError ? err.message : 'Erro ao atualizar status.');
     } finally {
       setSavingId(null);
+    }
+  }
+
+  async function handleDelete(vehicle: Vehicle) {
+    if (
+      !window.confirm(
+        `Excluir DEFINITIVAMENTE o veículo ${vehicle.plate}? Isso não pode ser desfeito. Só funciona se ele nunca tiver tido contrato — se já rodou de verdade, use "Marcar como vendido" em vez disso.`,
+      )
+    ) {
+      return;
+    }
+    setError(null);
+    try {
+      await api.delete(`/vehicles/${vehicle.id}`);
+      load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erro ao excluir o veículo.');
     }
   }
 
@@ -181,7 +217,11 @@ export function Fleet() {
             </thead>
             <tbody>
               {vehicles.map((v) => (
-                <tr key={v.id}>
+                <tr
+                  key={v.id}
+                  ref={v.id === highlightId ? highlightedRowRef : undefined}
+                  className={v.id === highlightId ? 'rtv-row-highlight' : undefined}
+                >
                   <td>
                     <span className="plate">{v.plate}</span>
                   </td>
@@ -208,10 +248,24 @@ export function Fleet() {
                     </button>
                     <button
                       className="logout-btn"
-                      style={{ color: 'var(--primary)', borderColor: 'var(--border)' }}
+                      style={{ color: 'var(--primary)', borderColor: 'var(--border)', marginRight: 6 }}
                       onClick={() => setFinancialTarget(v)}
                     >
                       Desempenho
+                    </button>
+                    <button
+                      className="logout-btn"
+                      style={{ color: 'var(--rtv-teal-600)', borderColor: 'var(--border)', marginRight: 6 }}
+                      onClick={() => setSaleTarget(v)}
+                    >
+                      Marcar como vendido
+                    </button>
+                    <button
+                      className="logout-btn"
+                      style={{ color: 'var(--rtv-danger)', borderColor: 'var(--border)' }}
+                      onClick={() => handleDelete(v)}
+                    >
+                      Excluir
                     </button>
                   </td>
                 </tr>
@@ -233,6 +287,14 @@ export function Fleet() {
 
       {financialTarget && (
         <VehicleFinancialPanel vehicle={financialTarget} onClose={() => setFinancialTarget(null)} />
+      )}
+
+      {saleTarget && (
+        <MarkAsSoldForm
+          vehicle={saleTarget}
+          onSaved={() => { setSaleTarget(null); load(); }}
+          onCancel={() => setSaleTarget(null)}
+        />
       )}
     </div>
   );
@@ -597,5 +659,66 @@ function VehicleFinancialPanel({ vehicle, onClose }: { vehicle: Vehicle; onClose
         </>
       ) : null}
     </div>
+  );
+}
+
+function MarkAsSoldForm({
+  vehicle,
+  onSaved,
+  onCancel,
+}: {
+  vehicle: Vehicle;
+  onSaved: () => void;
+  onCancel: () => void;
+}) {
+  const [salePrice, setSalePrice] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    try {
+      await api.post(`/vehicles/${vehicle.id}/sell`, { salePrice });
+      onSaved();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erro ao marcar como vendido.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <form className="card" onSubmit={handleSubmit} style={{ borderColor: 'var(--rtv-teal-600)' }}>
+      <h3 style={{ marginTop: 0 }}>Marcar como vendido — {vehicle.plate}</h3>
+      <p style={{ fontSize: 13, color: 'var(--ink-muted)', marginTop: -8 }}>
+        Esse veículo sai da Frota ativa imediatamente (não aparece mais nas listas de locação), mas todo o
+        histórico continua guardado — vai aparecer em "Vendas de Veículos" com o comparativo completo de quanto
+        custou, quanto rendeu e por quanto foi vendido.
+      </p>
+      {error && <div className="error-banner">{error}</div>}
+      <div className="field" style={{ marginBottom: 14 }}>
+        <label>Valor da venda (R$)</label>
+        <input
+          required
+          type="number"
+          step="0.01"
+          inputMode="decimal"
+          min="0"
+          value={salePrice}
+          onChange={(e) => setSalePrice(e.target.value)}
+          autoFocus
+        />
+      </div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button className="btn" type="submit" disabled={submitting}>
+          {submitting ? 'Salvando...' : 'Confirmar venda'}
+        </button>
+        <button type="button" className="logout-btn" style={{ color: 'var(--ink-muted)', borderColor: 'var(--border)' }} onClick={onCancel}>
+          Cancelar
+        </button>
+      </div>
+    </form>
   );
 }

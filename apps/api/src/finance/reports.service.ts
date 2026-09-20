@@ -1,6 +1,17 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { RequestUser } from '../auth/types';
+import { daysOverdue, saoPauloTodayUTC } from '../common/date.util';
+
+export interface PendencyItem {
+  id: string;
+  type: 'charge_overdue' | 'contract_signature' | 'maintenance_due' | 'maintenance_report';
+  severity: 'critical' | 'warning';
+  title: string;
+  description: string;
+  link: string;
+  date: Date | null;
+}
 
 @Injectable()
 export class ReportsService {
@@ -12,6 +23,7 @@ export class ReportsService {
         totalReceivable: '0.00',
         totalReceived: '0.00',
         totalPriorEarnings: '0.00',
+        totalVehicleSales: '0.00',
         totalExpenses: '0.00',
         balance: '0.00',
         chargesByType: [],
@@ -22,10 +34,12 @@ export class ReportsService {
       };
     }
 
-    const [pendingCharges, paidCharges, expenses, priorEarningsAgg, chargesByType, fleetSize, activeContracts, recentCharges, recentExpenses] =
+    const [pendingCharges, paidCharges, expenses, priorEarningsAgg, vehicleSalesAgg, chargesByType, fleetSize, activeContracts, recentCharges, recentExpenses] =
       await Promise.all([
         this.prisma.charge.aggregate({
-          where: { companyId: actor.companyId, status: 'pending' },
+          // 'atrasado' continua sendo dinheiro a receber, só que já vencido — precisa
+          // entrar no total, senão "a receber" fica menor do que a dívida real do cliente.
+          where: { companyId: actor.companyId, status: { in: ['pending', 'atrasado'] } },
           _sum: { amount: true },
         }),
         this.prisma.charge.aggregate({
@@ -39,6 +53,10 @@ export class ReportsService {
         this.prisma.vehicle.aggregate({
           where: { companyId: actor.companyId },
           _sum: { priorEarnings: true },
+        }),
+        this.prisma.vehicle.aggregate({
+          where: { companyId: actor.companyId, status: 'sold' },
+          _sum: { salePrice: true },
         }),
         this.prisma.charge.groupBy({
           by: ['type'],
@@ -68,13 +86,15 @@ export class ReportsService {
     const totalReceivable = Number(pendingCharges._sum.amount ?? 0);
     const totalReceivedFromCharges = Number(paidCharges._sum.amount ?? 0);
     const totalPriorEarnings = Number(priorEarningsAgg._sum.priorEarnings ?? 0);
-    const totalReceived = totalReceivedFromCharges + totalPriorEarnings; // ganho retroativo entra como recebido, igual no painel do veículo
+    const totalVehicleSales = Number(vehicleSalesAgg._sum.salePrice ?? 0);
+    const totalReceived = totalReceivedFromCharges + totalPriorEarnings + totalVehicleSales; // ganho retroativo e venda de veículo entram como recebido
     const totalExpenses = Number(expenses._sum.amount ?? 0);
 
     return {
       totalReceivable: totalReceivable.toFixed(2),
       totalReceived: totalReceived.toFixed(2),
       totalPriorEarnings: totalPriorEarnings.toFixed(2),
+      totalVehicleSales: totalVehicleSales.toFixed(2),
       totalExpenses: totalExpenses.toFixed(2),
       balance: (totalReceived - totalExpenses).toFixed(2),
       chargesByType: chargesByType.map((c: { type: string; _count: number; _sum: { amount: unknown } }) => ({
@@ -152,7 +172,10 @@ export class ReportsService {
         },
       }),
       this.prisma.charge.aggregate({
-        where: { companyId: actor.companyId, status: 'pending', dueDate: { lt: now } },
+        // Usa o status persistido ('atrasado'), mantido em dia pelo worker a cada 1 min —
+        // não recalcula "dueDate < agora" aqui, porque isso marcaria como atrasada uma
+        // cobrança que vence hoje mesmo antes de o dia terminar (bug de fuso horário).
+        where: { companyId: actor.companyId, status: 'atrasado' },
         _sum: { amount: true },
         _count: true,
       }),
@@ -232,6 +255,139 @@ export class ReportsService {
       },
       maintenanceReminders: maintenanceReminders.slice(0, 10),
     };
+  }
+
+  /**
+   * Pendências gerais, itemizadas — cada uma diz exatamente o que é e pra onde ir.
+   * É a fonte da lista "Pendências que precisam de atenção" no Dashboard: cobrança
+   * atrasada, contrato esperando assinatura, veículo batendo km/data de revisão, e
+   * relato de manutenção do cliente ainda não atendido.
+   */
+  async getPendencies(actor: RequestUser): Promise<PendencyItem[]> {
+    if (!actor.companyId) return [];
+
+    const now = new Date();
+    const today = saoPauloTodayUTC(now);
+
+    const [overdueCharges, awaitingSignatureContracts, lastMaintenancePerVehicle, openReports] = await Promise.all([
+      this.prisma.charge.findMany({
+        where: { companyId: actor.companyId, status: 'atrasado' },
+        orderBy: { dueDate: 'asc' },
+        include: {
+          customer: { select: { name: true } },
+          contract: { select: { vehicle: { select: { plate: true } } } },
+        },
+      }),
+      this.prisma.contract.findMany({
+        where: { companyId: actor.companyId, status: 'awaiting_signature' },
+        orderBy: { createdAt: 'asc' },
+        include: {
+          customer: { select: { name: true } },
+          vehicle: { select: { plate: true } },
+        },
+      }),
+      this.prisma.maintenance.findMany({
+        where: { companyId: actor.companyId, nextDueKm: { not: null } },
+        orderBy: { performedAt: 'desc' },
+        select: {
+          vehicleId: true,
+          nextDueKm: true,
+          nextDueDate: true,
+          vehicle: { select: { plate: true, brand: true, model: true, odometerKm: true, status: true } },
+        },
+      }),
+      this.prisma.maintenanceReport.findMany({
+        where: { companyId: actor.companyId, status: 'open' },
+        orderBy: { reportedAt: 'asc' },
+        include: {
+          contract: { select: { id: true, customer: { select: { name: true } }, vehicle: { select: { plate: true } } } },
+        },
+      }),
+    ]);
+
+    const items: PendencyItem[] = [];
+
+    for (const c of overdueCharges) {
+      const who = c.customer?.name ?? c.contract?.vehicle?.plate ?? 'sem cliente vinculado';
+      const days = c.dueDate ? daysOverdue(c.dueDate, now) : 0;
+      items.push({
+        id: `charge-${c.id}`,
+        type: 'charge_overdue',
+        severity: 'critical',
+        title: `Cobrança atrasada — ${who}`,
+        description: `${c.description} · R$ ${Number(c.amount).toFixed(2)} · ${days} dia(s) de atraso`,
+        link: `/financeiro?highlight=${c.id}`,
+        date: c.dueDate,
+      });
+    }
+
+    for (const ct of awaitingSignatureContracts) {
+      items.push({
+        id: `contract-${ct.id}`,
+        type: 'contract_signature',
+        severity: 'warning',
+        title: `Contrato aguardando assinatura — ${ct.customer?.name ?? ct.vehicle?.plate ?? 'sem cliente'}`,
+        description: `Veículo ${ct.vehicle?.plate ?? '—'} · criado em ${ct.createdAt.toLocaleDateString('pt-BR')}`,
+        link: `/contratos?highlight=${ct.id}`,
+        date: ct.createdAt,
+      });
+    }
+
+    // Manutenção vencida/próxima por km ou data — mesma lógica de dedup por veículo do
+    // painel operacional, mas aqui separamos "já vencida" (crítico) de "próxima" (atenção).
+    const seenVehicles = new Set<string>();
+    for (const m of lastMaintenancePerVehicle) {
+      if (seenVehicles.has(m.vehicleId)) continue;
+      seenVehicles.add(m.vehicleId);
+      if (m.vehicle.status === 'sold' || m.vehicle.status === 'inactive') continue; // fora de operação, não pendência
+
+      const kmRemaining = m.nextDueKm !== null ? m.nextDueKm - m.vehicle.odometerKm : null;
+      const dateOverdue = m.nextDueDate ? m.nextDueDate.getTime() <= today.getTime() : false;
+      const dateSoon = m.nextDueDate ? m.nextDueDate.getTime() - now.getTime() < 14 * 24 * 60 * 60 * 1000 : false;
+      const kmOverdue = kmRemaining !== null && kmRemaining <= 0;
+      const kmSoon = kmRemaining !== null && kmRemaining <= 1000;
+
+      if (!kmOverdue && !dateOverdue && !kmSoon && !dateSoon) continue;
+
+      const reason = kmOverdue
+        ? `${Math.abs(kmRemaining as number)} km além do previsto pra próxima revisão`
+        : dateOverdue
+          ? 'revisão prevista já venceu'
+          : kmSoon
+            ? `faltam ${kmRemaining} km pra próxima revisão`
+            : 'revisão prevista pra breve';
+
+      items.push({
+        id: `maintenance-${m.vehicleId}`,
+        type: 'maintenance_due',
+        severity: kmOverdue || dateOverdue ? 'critical' : 'warning',
+        title: `Manutenção — ${m.vehicle.plate} ${m.vehicle.brand} ${m.vehicle.model}`,
+        description: reason,
+        link: `/frota?highlight=${m.vehicleId}`,
+        date: m.nextDueDate,
+      });
+    }
+
+    for (const r of openReports) {
+      const who = r.contract.customer?.name ?? r.contract.vehicle?.plate ?? 'sem cliente';
+      items.push({
+        id: `maintenance-report-${r.id}`,
+        type: 'maintenance_report',
+        severity: 'warning',
+        title: `Relato de manutenção não atendido — ${who}`,
+        description: r.description,
+        link: `/contratos?highlight=${r.contract.id}`,
+        date: r.reportedAt,
+      });
+    }
+
+    // Crítico primeiro, depois por data (mais antigo primeiro dentro de cada grupo).
+    return items.sort((a, b) => {
+      if (a.severity !== b.severity) return a.severity === 'critical' ? -1 : 1;
+      const da = a.date ? a.date.getTime() : 0;
+      const db = b.date ? b.date.getTime() : 0;
+      return da - db;
+    });
   }
 
   /** Só Super Admin — visão de crescimento da plataforma inteira, não de uma empresa. */

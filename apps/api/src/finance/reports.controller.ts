@@ -20,6 +20,11 @@ export class ReportsController {
     return this.reportsService.getOperationsDashboard(actor);
   }
 
+  @Get('pendencies')
+  getPendencies(@CurrentUser() actor: RequestUser) {
+    return this.reportsService.getPendencies(actor);
+  }
+
   /** Só Super Admin — sobrescreve a permissão da classe (REPORTS_VIEW), que o Super Admin não tem. */
   @Get('platform-growth')
   @RequirePermissions(PermissionCode.PLATFORM_MANAGE)

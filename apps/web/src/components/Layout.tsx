@@ -21,6 +21,7 @@ import {
   Eye,
   TrendingUp,
   Home,
+  Banknote,
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { BrandMark } from './BrandMark';
@@ -107,6 +108,11 @@ export function Layout() {
               {hasPermission('fleet.manage') && (
                 <NavLink to="/frota" className={linkClass}>
                   <Car /> Frota
+                </NavLink>
+              )}
+              {hasPermission('fleet.manage') && (
+                <NavLink to="/vendas-de-veiculos" className={linkClass}>
+                  <Banknote /> Vendas de Veículos
                 </NavLink>
               )}
               {hasPermission('customers.manage') && (

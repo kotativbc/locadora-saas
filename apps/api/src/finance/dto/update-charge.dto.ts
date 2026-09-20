@@ -19,6 +19,6 @@ export class UpdateChargeDto {
   dueDate?: string;
 
   @IsOptional()
-  @IsIn(['pending', 'paid', 'cancelled'])
-  status?: 'pending' | 'paid' | 'cancelled';
+  @IsIn(['pending', 'atrasado', 'paid', 'cancelled'])
+  status?: 'pending' | 'atrasado' | 'paid' | 'cancelled';
 }

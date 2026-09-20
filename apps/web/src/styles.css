@@ -316,6 +316,26 @@ a {
   margin-top: 16px;
 }
 
+.pendency-row {
+  transition: background-color 0.12s ease;
+}
+.pendency-row:hover {
+  background-color: var(--rtv-surface-muted, rgba(0, 0, 0, 0.035));
+}
+
+/* Linha "achada" via ?highlight=id vindo de um clique no Dashboard */
+@keyframes rtv-highlight-fade {
+  from {
+    background-color: var(--rtv-warning-bg, #fdf3e4);
+  }
+  to {
+    background-color: transparent;
+  }
+}
+.rtv-row-highlight {
+  animation: rtv-highlight-fade 2.4s ease-out 1;
+}
+
 /* ---------- Formulários ---------- */
 
 .field {
