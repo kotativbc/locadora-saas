@@ -11,11 +11,12 @@ import { RequestUser } from './types';
 
 const REFRESH_COOKIE = 'refresh_token';
 const REFRESH_COOKIE_PATH = '/api/auth';
-// Controlado por env, não por NODE_ENV: em modo IP/sem domínio ainda não há
-// HTTPS, e um cookie "Secure" simplesmente não é enviado pelo navegador numa
-// conexão HTTP — travaria o refresh inteiro. Ligar quando o domínio com TLS
-// estiver ativo (definir COOKIE_SECURE=true no .env).
-const COOKIE_SECURE = process.env.COOKIE_SECURE === 'true';
+// Seguro por padrão: só desliga com COOKIE_SECURE=false explícito no .env,
+// pro caso raro de bootstrap em modo IP/sem domínio (onde ainda não há HTTPS
+// e um cookie "Secure" simplesmente não é enviado pelo navegador numa conexão
+// HTTP — travaria o refresh inteiro). Em produção com domínio + TLS (o caso
+// normal), não precisa declarar a variável — já nasce seguro.
+const COOKIE_SECURE = process.env.COOKIE_SECURE !== 'false';
 
 @Controller('auth')
 export class AuthController {

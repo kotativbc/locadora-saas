@@ -1,6 +1,21 @@
 rentovix.kotati.com.br {
 	encode gzip
 
+	# Cabeçalhos de segurança — aplicam a toda resposta do site (frontend
+	# estático e API por trás de /api/*, já que passam pelo mesmo Caddy).
+	# CSP calibrado pro build atual: sem <script> inline, CSS só via arquivo
+	# externo, estilos inline (style={{}} do React) liberados via
+	# 'unsafe-inline' em style-src. Se algum dia carregar algo de fora
+	# (fonte de CDN, script de terceiro), precisa abrir exceção aqui.
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "geolocation=(), camera=(), microphone=()"
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'"
+	}
+
 	handle /api/* {
 		reverse_proxy api:3000
 	}
