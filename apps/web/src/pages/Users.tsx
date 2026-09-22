@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { api, ApiError } from '../api';
 import { EmptyState } from '../components/EmptyState';
 import { useAuth } from '../auth/AuthContext';
@@ -28,6 +28,30 @@ export function Users() {
   const [formOpen, setFormOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<UserRow | null>(null);
 
+  // Filtros
+  const [search, setSearch] = useState('');
+  const [roleFilter, setRoleFilter] = useState('all');
+  const [activeFilter, setActiveFilter] = useState<'all' | 'active' | 'inactive'>('all');
+
+  const filteredUsers = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return users.filter((u) => {
+      if (activeFilter === 'active' && !u.active) return false;
+      if (activeFilter === 'inactive' && u.active) return false;
+      if (roleFilter !== 'all' && !u.roles.some((r) => r.role.code === roleFilter)) return false;
+      if (term && !`${u.name} ${u.email}`.toLowerCase().includes(term)) return false;
+      return true;
+    });
+  }, [users, search, roleFilter, activeFilter]);
+
+  const hasActiveFilters = search.trim() !== '' || roleFilter !== 'all' || activeFilter !== 'all';
+
+  function clearFilters() {
+    setSearch('');
+    setRoleFilter('all');
+    setActiveFilter('all');
+  }
+
   async function load() {
     setLoading(true);
     try {
@@ -54,16 +78,53 @@ export function Users() {
 
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <strong>{users.length} usuário(s)</strong>
+          <strong>
+            {filteredUsers.length} usuário(s){hasActiveFilters && users.length !== filteredUsers.length ? ` de ${users.length}` : ''}
+          </strong>
           <button className="btn btn--accent" onClick={() => setFormOpen((v) => !v)}>
             {formOpen ? 'Cancelar' : '+ Novo usuário'}
           </button>
         </div>
 
+        {users.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'flex-end', marginBottom: 16, paddingBottom: 16, borderBottom: '1px solid var(--rtv-line)' }}>
+            <div className="field" style={{ marginBottom: 0, flex: '1 1 220px' }}>
+              <label>Buscar</label>
+              <input type="text" placeholder="Nome ou e-mail..." value={search} onChange={(e) => setSearch(e.target.value)} />
+            </div>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>Papel</label>
+              <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)}>
+                <option value="all">Todos</option>
+                {Object.entries(ROLE_LABELS).map(([code, label]) => (
+                  <option key={code} value={code}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>Status</label>
+              <select value={activeFilter} onChange={(e) => setActiveFilter(e.target.value as typeof activeFilter)}>
+                <option value="all">Todos</option>
+                <option value="active">Ativo</option>
+                <option value="inactive">Inativo</option>
+              </select>
+            </div>
+            {hasActiveFilters && (
+              <button type="button" className="logout-btn" style={{ color: 'var(--ink-muted)', borderColor: 'var(--border)' }} onClick={clearFilters}>
+                Limpar filtros
+              </button>
+            )}
+          </div>
+        )}
+
         {loading ? (
           <p>Carregando...</p>
         ) : users.length === 0 ? (
           <EmptyState title="Nenhum usuário além de você" body="Cadastre a equipe pra dar acesso à plataforma com o papel certo pra cada um." />
+        ) : filteredUsers.length === 0 ? (
+          <EmptyState title="Nenhum usuário encontrado" body="Nenhum usuário bate com os filtros aplicados." />
         ) : (
           <table>
             <thead>
@@ -77,7 +138,7 @@ export function Users() {
               </tr>
             </thead>
             <tbody>
-              {users.map((u) => (
+              {filteredUsers.map((u) => (
                 <tr key={u.id}>
                   <td>{u.name}</td>
                   <td>{u.email}</td>

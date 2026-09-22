@@ -24,19 +24,16 @@ export function TermsAndDpa() {
       </p>
 
       <div className="legal-notice">
-        Este documento tem trechos ainda pendentes de definição, destacados em amarelo. Não deve ser considerado
-        vigente ou publicado como final antes da revisão de um advogado e do fechamento desses pontos — em
-        especial a qualificação do Fornecedor abaixo, que depende de definição contábil (CPF ou CNPJ).
+        Este documento tem trechos ainda pendentes de definição, destacados em amarelo (data de vigência, e a
+        cláusula 8.3 sobre tributos, que precisa validação de contador). Não deve ser considerado vigente antes da
+        revisão de um advogado e do fechamento desses pontos — está publicado nesta URL como rascunho avançado, não
+        como versão final.
       </div>
 
       <h2>Fornecedor</h2>
       <p>
-        <Pending>
-          nome completo da pessoa física, empresário individual ou pessoa jurídica responsável pelo Rentovix — CPF
-          ou CNPJ, conforme definição contábil ainda pendente
-        </Pending>
-        , com endereço em <Pending>endereço</Pending>, e-mail <Pending>e-mail</Pending> ("Rentovix" ou
-        "Fornecedor").
+        Samuel Figueiredo Catarino, pessoa física, CPF 134.004.646-60, com endereço na R. Padre Silveira Lôbo, 610
+        — Pampulha, Belo Horizonte — MG, 31270-740, e-mail contato@kotati.com.br ("Rentovix" ou "Fornecedor").
       </p>
 
       <h2>PARTE A — Termos de Uso e Prestação de Serviços do Rentovix</h2>

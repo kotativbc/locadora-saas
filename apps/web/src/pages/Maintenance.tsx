@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { api, ApiError } from '../api';
 import { formatDateOnly } from '../dateUtils';
 import { EmptyState } from '../components/EmptyState';
@@ -39,6 +39,33 @@ export function Maintenance() {
   const [error, setError] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<MaintenanceRecord | null>(null);
+
+  // Filtros
+  const [search, setSearch] = useState('');
+  const [typeFilter, setTypeFilter] = useState('all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+
+  const filteredRecords = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return records.filter((r) => {
+      if (typeFilter !== 'all' && r.type !== typeFilter) return false;
+      if (term && !`${r.description} ${r.vehicle.plate} ${r.vehicle.brand} ${r.vehicle.model} ${r.vendor ?? ''}`.toLowerCase().includes(term))
+        return false;
+      if (dateFrom && r.performedAt.slice(0, 10) < dateFrom) return false;
+      if (dateTo && r.performedAt.slice(0, 10) > dateTo) return false;
+      return true;
+    });
+  }, [records, search, typeFilter, dateFrom, dateTo]);
+
+  const hasActiveFilters = search.trim() !== '' || typeFilter !== 'all' || dateFrom !== '' || dateTo !== '';
+
+  function clearFilters() {
+    setSearch('');
+    setTypeFilter('all');
+    setDateFrom('');
+    setDateTo('');
+  }
 
   async function load() {
     setLoading(true);
@@ -87,16 +114,53 @@ export function Maintenance() {
 
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <strong>{records.length} registro(s)</strong>
+          <strong>
+            {filteredRecords.length} registro(s){hasActiveFilters && records.length !== filteredRecords.length ? ` de ${records.length}` : ''}
+          </strong>
           <button className="btn btn--accent" onClick={() => setFormOpen((v) => !v)}>
             {formOpen ? 'Cancelar' : '+ Nova manutenção'}
           </button>
         </div>
 
+        {records.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'flex-end', marginBottom: 16, paddingBottom: 16, borderBottom: '1px solid var(--rtv-line)' }}>
+            <div className="field" style={{ marginBottom: 0, flex: '1 1 220px' }}>
+              <label>Buscar</label>
+              <input type="text" placeholder="Descrição, placa ou oficina..." value={search} onChange={(e) => setSearch(e.target.value)} />
+            </div>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>Tipo</label>
+              <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
+                <option value="all">Todos</option>
+                {Object.entries(TYPE_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>De</label>
+              <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+            </div>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>até</label>
+              <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+            </div>
+            {hasActiveFilters && (
+              <button type="button" className="logout-btn" style={{ color: 'var(--ink-muted)', borderColor: 'var(--border)' }} onClick={clearFilters}>
+                Limpar filtros
+              </button>
+            )}
+          </div>
+        )}
+
         {loading ? (
           <p>Carregando...</p>
         ) : records.length === 0 ? (
           <EmptyState title="Nenhuma manutenção registrada" body="Registre trocas de óleo, revisões e reparos aqui pra manter o histórico da frota." />
+        ) : filteredRecords.length === 0 ? (
+          <EmptyState title="Nenhuma manutenção encontrada" body="Nenhuma manutenção bate com os filtros aplicados." />
         ) : (
           <table>
             <thead>
@@ -111,7 +175,7 @@ export function Maintenance() {
               </tr>
             </thead>
             <tbody>
-              {records.map((r) => (
+              {filteredRecords.map((r) => (
                 <tr key={r.id}>
                   <td>
                     <span className="plate">{r.vehicle.plate}</span> {r.vehicle.brand} {r.vehicle.model}

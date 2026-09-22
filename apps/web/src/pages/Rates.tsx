@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { api, ApiError } from '../api';
 import { EmptyState } from '../components/EmptyState';
 
@@ -36,6 +36,28 @@ export function Rates() {
   const [error, setError] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<RatePlan | null>(null);
+
+  // Filtros
+  const [search, setSearch] = useState('');
+  const [activeFilter, setActiveFilter] = useState<'all' | 'active' | 'inactive'>('all');
+
+  const filteredRatePlans = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return ratePlans.filter((r) => {
+      if (activeFilter === 'active' && !r.active) return false;
+      if (activeFilter === 'inactive' && r.active) return false;
+      if (term && !`${r.name} ${r.category ?? ''} ${r.vehicle?.plate ?? ''} ${r.vehicle?.brand ?? ''} ${r.vehicle?.model ?? ''}`.toLowerCase().includes(term))
+        return false;
+      return true;
+    });
+  }, [ratePlans, search, activeFilter]);
+
+  const hasActiveFilters = search.trim() !== '' || activeFilter !== 'all';
+
+  function clearFilters() {
+    setSearch('');
+    setActiveFilter('all');
+  }
 
   async function load() {
     setLoading(true);
@@ -81,16 +103,42 @@ export function Rates() {
 
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <strong>{ratePlans.length} tarifa(s)</strong>
+          <strong>
+            {filteredRatePlans.length} tarifa(s){hasActiveFilters && ratePlans.length !== filteredRatePlans.length ? ` de ${ratePlans.length}` : ''}
+          </strong>
           <button className="btn btn--accent" onClick={() => setFormOpen((v) => !v)}>
             {formOpen ? 'Cancelar' : '+ Nova tarifa'}
           </button>
         </div>
 
+        {ratePlans.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'flex-end', marginBottom: 16, paddingBottom: 16, borderBottom: '1px solid var(--rtv-line)' }}>
+            <div className="field" style={{ marginBottom: 0, flex: '1 1 240px' }}>
+              <label>Buscar</label>
+              <input type="text" placeholder="Nome, categoria ou placa..." value={search} onChange={(e) => setSearch(e.target.value)} />
+            </div>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>Status</label>
+              <select value={activeFilter} onChange={(e) => setActiveFilter(e.target.value as typeof activeFilter)}>
+                <option value="all">Todos</option>
+                <option value="active">Ativa</option>
+                <option value="inactive">Inativa</option>
+              </select>
+            </div>
+            {hasActiveFilters && (
+              <button type="button" className="logout-btn" style={{ color: 'var(--ink-muted)', borderColor: 'var(--border)' }} onClick={clearFilters}>
+                Limpar filtros
+              </button>
+            )}
+          </div>
+        )}
+
         {loading ? (
           <p>Carregando...</p>
         ) : ratePlans.length === 0 ? (
           <EmptyState title="Nenhuma tarifa cadastrada" body="Cadastre uma tarifa por categoria ou por veículo pra usar na criação de contratos." />
+        ) : filteredRatePlans.length === 0 ? (
+          <EmptyState title="Nenhuma tarifa encontrada" body="Nenhuma tarifa bate com os filtros aplicados." />
         ) : (
           <table>
             <thead>
@@ -105,7 +153,7 @@ export function Rates() {
               </tr>
             </thead>
             <tbody>
-              {ratePlans.map((r) => (
+              {filteredRatePlans.map((r) => (
                 <tr key={r.id}>
                   <td>{r.name}</td>
                   <td>

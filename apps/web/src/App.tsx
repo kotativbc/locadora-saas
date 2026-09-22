@@ -30,6 +30,7 @@ import { Finance } from './pages/Finance';
 import { Expenses } from './pages/Expenses';
 import { Reports } from './pages/Reports';
 import { AuditLog } from './pages/AuditLog';
+import { TermsAndDpa } from './pages/TermsAndDpa';
 
 export function App() {
   return (
@@ -42,6 +43,7 @@ export function App() {
           <Route path="/assinar/:token" element={<PublicSign />} />
           <Route path="/sinalizar/:token" element={<PublicMaintenanceReport />} />
           <Route path="/vistoria/:token" element={<PublicInspection />} />
+          <Route path="/termos" element={<TermsAndDpa />} />
           <Route element={<RequireAuth />}>
             <Route element={<Layout />}>
               <Route path="/" element={<Home />} />

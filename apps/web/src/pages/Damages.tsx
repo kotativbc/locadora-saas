@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { api, ApiError } from '../api';
 import { StatusBadge } from '../components/StatusBadge';
 import { EmptyState } from '../components/EmptyState';
@@ -56,6 +56,29 @@ export function Damages() {
   const [savingId, setSavingId] = useState<string | null>(null);
   const [editTarget, setEditTarget] = useState<DamageRecord | null>(null);
 
+  // Filtros
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'open' | 'resolved'>('all');
+  const [severityFilter, setSeverityFilter] = useState('all');
+
+  const filteredDamages = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return damages.filter((d) => {
+      if (statusFilter !== 'all' && d.status !== statusFilter) return false;
+      if (severityFilter !== 'all' && d.severity !== severityFilter) return false;
+      if (term && !`${d.description} ${d.vehicle.plate} ${d.vehicle.brand} ${d.vehicle.model}`.toLowerCase().includes(term)) return false;
+      return true;
+    });
+  }, [damages, search, statusFilter, severityFilter]);
+
+  const hasActiveFilters = search.trim() !== '' || statusFilter !== 'all' || severityFilter !== 'all';
+
+  function clearFilters() {
+    setSearch('');
+    setStatusFilter('all');
+    setSeverityFilter('all');
+  }
+
   async function load() {
     setLoading(true);
     try {
@@ -103,16 +126,53 @@ export function Damages() {
 
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <strong>{damages.length} avaria(s)</strong>
+          <strong>
+            {filteredDamages.length} avaria(s){hasActiveFilters && damages.length !== filteredDamages.length ? ` de ${damages.length}` : ''}
+          </strong>
           <button className="btn btn--accent" onClick={() => setFormOpen((v) => !v)}>
             {formOpen ? 'Cancelar' : '+ Nova avaria'}
           </button>
         </div>
 
+        {damages.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'flex-end', marginBottom: 16, paddingBottom: 16, borderBottom: '1px solid var(--rtv-line)' }}>
+            <div className="field" style={{ marginBottom: 0, flex: '1 1 220px' }}>
+              <label>Buscar</label>
+              <input type="text" placeholder="Descrição ou placa..." value={search} onChange={(e) => setSearch(e.target.value)} />
+            </div>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>Status</label>
+              <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}>
+                <option value="all">Todos</option>
+                <option value="open">Em aberto</option>
+                <option value="resolved">Resolvida</option>
+              </select>
+            </div>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>Gravidade</label>
+              <select value={severityFilter} onChange={(e) => setSeverityFilter(e.target.value)}>
+                <option value="all">Todas</option>
+                {Object.entries(SEVERITY_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {hasActiveFilters && (
+              <button type="button" className="logout-btn" style={{ color: 'var(--ink-muted)', borderColor: 'var(--border)' }} onClick={clearFilters}>
+                Limpar filtros
+              </button>
+            )}
+          </div>
+        )}
+
         {loading ? (
           <p>Carregando...</p>
         ) : damages.length === 0 ? (
           <EmptyState title="Nenhuma avaria registrada" body="Avarias encontradas em vistorias ou registradas avulsas aparecem aqui." />
+        ) : filteredDamages.length === 0 ? (
+          <EmptyState title="Nenhuma avaria encontrada" body="Nenhuma avaria bate com os filtros aplicados." />
         ) : (
           <table>
             <thead>
@@ -127,7 +187,7 @@ export function Damages() {
               </tr>
             </thead>
             <tbody>
-              {damages.map((d) => (
+              {filteredDamages.map((d) => (
                 <tr key={d.id}>
                   <td>
                     <span className="plate">{d.vehicle.plate}</span> {d.vehicle.brand} {d.vehicle.model}

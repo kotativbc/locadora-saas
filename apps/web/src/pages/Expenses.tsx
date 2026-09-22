@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { api, ApiError } from '../api';
 import { formatDateOnly } from '../dateUtils';
 import { EmptyState } from '../components/EmptyState';
@@ -38,6 +38,33 @@ export function Expenses() {
   const [error, setError] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Expense | null>(null);
+
+  // Filtros
+  const [search, setSearch] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+
+  const filteredExpenses = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return expenses.filter((e) => {
+      if (categoryFilter !== 'all' && e.category !== categoryFilter) return false;
+      if (term && !`${e.description} ${e.vehicle?.plate ?? ''} ${e.vehicle?.brand ?? ''} ${e.vehicle?.model ?? ''}`.toLowerCase().includes(term))
+        return false;
+      if (dateFrom && e.incurredAt.slice(0, 10) < dateFrom) return false;
+      if (dateTo && e.incurredAt.slice(0, 10) > dateTo) return false;
+      return true;
+    });
+  }, [expenses, search, categoryFilter, dateFrom, dateTo]);
+
+  const hasActiveFilters = search.trim() !== '' || categoryFilter !== 'all' || dateFrom !== '' || dateTo !== '';
+
+  function clearFilters() {
+    setSearch('');
+    setCategoryFilter('all');
+    setDateFrom('');
+    setDateTo('');
+  }
 
   async function load() {
     setLoading(true);
@@ -84,16 +111,53 @@ export function Expenses() {
 
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <strong>{expenses.length} despesa(s)</strong>
+          <strong>
+            {filteredExpenses.length} despesa(s){hasActiveFilters && expenses.length !== filteredExpenses.length ? ` de ${expenses.length}` : ''}
+          </strong>
           <button className="btn btn--accent" onClick={() => setFormOpen((v) => !v)}>
             {formOpen ? 'Cancelar' : '+ Nova despesa'}
           </button>
         </div>
 
+        {expenses.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'flex-end', marginBottom: 16, paddingBottom: 16, borderBottom: '1px solid var(--rtv-line)' }}>
+            <div className="field" style={{ marginBottom: 0, flex: '1 1 220px' }}>
+              <label>Buscar</label>
+              <input type="text" placeholder="Descrição ou placa..." value={search} onChange={(e) => setSearch(e.target.value)} />
+            </div>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>Categoria</label>
+              <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
+                <option value="all">Todas</option>
+                {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>De</label>
+              <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+            </div>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>até</label>
+              <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+            </div>
+            {hasActiveFilters && (
+              <button type="button" className="logout-btn" style={{ color: 'var(--ink-muted)', borderColor: 'var(--border)' }} onClick={clearFilters}>
+                Limpar filtros
+              </button>
+            )}
+          </div>
+        )}
+
         {loading ? (
           <p>Carregando...</p>
         ) : expenses.length === 0 ? (
           <EmptyState title="Nenhuma despesa registrada" body="Registre manutenção, combustível, seguro e outros custos aqui." />
+        ) : filteredExpenses.length === 0 ? (
+          <EmptyState title="Nenhuma despesa encontrada" body="Nenhuma despesa bate com os filtros aplicados." />
         ) : (
           <table>
             <thead>
@@ -107,7 +171,7 @@ export function Expenses() {
               </tr>
             </thead>
             <tbody>
-              {expenses.map((e) => (
+              {filteredExpenses.map((e) => (
                 <tr key={e.id}>
                   <td>{CATEGORY_LABELS[e.category] ?? e.category}</td>
                   <td>{e.description}</td>

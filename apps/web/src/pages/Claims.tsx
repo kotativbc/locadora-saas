@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { api, ApiError } from '../api';
 import { StatusSelect, type StatusOption } from '../components/StatusSelect';
 import { formatDateOnly } from '../dateUtils';
@@ -53,6 +53,35 @@ export function Claims() {
   const [savingId, setSavingId] = useState<string | null>(null);
   const [editTarget, setEditTarget] = useState<Claim | null>(null);
 
+  // Filtros
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [typeFilter, setTypeFilter] = useState('all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+
+  const filteredClaims = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return claims.filter((c) => {
+      if (statusFilter !== 'all' && c.status !== statusFilter) return false;
+      if (typeFilter !== 'all' && c.type !== typeFilter) return false;
+      if (term && !`${c.description} ${c.vehicle.plate} ${c.vehicle.brand} ${c.vehicle.model}`.toLowerCase().includes(term)) return false;
+      if (dateFrom && c.occurredAt.slice(0, 10) < dateFrom) return false;
+      if (dateTo && c.occurredAt.slice(0, 10) > dateTo) return false;
+      return true;
+    });
+  }, [claims, search, statusFilter, typeFilter, dateFrom, dateTo]);
+
+  const hasActiveFilters = search.trim() !== '' || statusFilter !== 'all' || typeFilter !== 'all' || dateFrom !== '' || dateTo !== '';
+
+  function clearFilters() {
+    setSearch('');
+    setStatusFilter('all');
+    setTypeFilter('all');
+    setDateFrom('');
+    setDateTo('');
+  }
+
   async function load() {
     setLoading(true);
     try {
@@ -93,16 +122,64 @@ export function Claims() {
 
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <strong>{claims.length} sinistro(s)</strong>
+          <strong>
+            {filteredClaims.length} sinistro(s){hasActiveFilters && claims.length !== filteredClaims.length ? ` de ${claims.length}` : ''}
+          </strong>
           <button className="btn btn--accent" onClick={() => setFormOpen((v) => !v)}>
             {formOpen ? 'Cancelar' : '+ Novo sinistro'}
           </button>
         </div>
 
+        {claims.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'flex-end', marginBottom: 16, paddingBottom: 16, borderBottom: '1px solid var(--rtv-line)' }}>
+            <div className="field" style={{ marginBottom: 0, flex: '1 1 220px' }}>
+              <label>Buscar</label>
+              <input type="text" placeholder="Descrição ou placa..." value={search} onChange={(e) => setSearch(e.target.value)} />
+            </div>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>Status</label>
+              <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                <option value="all">Todos</option>
+                {STATUS_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>Tipo</label>
+              <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
+                <option value="all">Todos</option>
+                {Object.entries(TYPE_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>De</label>
+              <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+            </div>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>até</label>
+              <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+            </div>
+            {hasActiveFilters && (
+              <button type="button" className="logout-btn" style={{ color: 'var(--ink-muted)', borderColor: 'var(--border)' }} onClick={clearFilters}>
+                Limpar filtros
+              </button>
+            )}
+          </div>
+        )}
+
         {loading ? (
           <p>Carregando...</p>
         ) : claims.length === 0 ? (
           <EmptyState title="Nenhum sinistro registrado" body="Quando um acidente, roubo ou outro sinistro acontecer, registre aqui." />
+        ) : filteredClaims.length === 0 ? (
+          <EmptyState title="Nenhum sinistro encontrado" body="Nenhum sinistro bate com os filtros aplicados." />
         ) : (
           <table>
             <thead>
@@ -117,7 +194,7 @@ export function Claims() {
               </tr>
             </thead>
             <tbody>
-              {claims.map((c) => (
+              {filteredClaims.map((c) => (
                 <tr key={c.id}>
                   <td>
                     <span className="plate">{c.vehicle.plate}</span> {c.vehicle.brand} {c.vehicle.model}

@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { api, ApiError } from '../api';
 import { EmptyState } from '../components/EmptyState';
 
@@ -19,6 +19,27 @@ export function Customers() {
   const [error, setError] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Customer | null>(null);
+
+  // Filtros
+  const [search, setSearch] = useState('');
+  const [activeFilter, setActiveFilter] = useState<'all' | 'active' | 'inactive'>('all');
+
+  const filteredCustomers = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return customers.filter((c) => {
+      if (activeFilter === 'active' && !c.active) return false;
+      if (activeFilter === 'inactive' && c.active) return false;
+      if (term && !`${c.name} ${c.document} ${c.email ?? ''} ${c.phone ?? ''}`.toLowerCase().includes(term)) return false;
+      return true;
+    });
+  }, [customers, search, activeFilter]);
+
+  const hasActiveFilters = search.trim() !== '' || activeFilter !== 'all';
+
+  function clearFilters() {
+    setSearch('');
+    setActiveFilter('all');
+  }
 
   async function load() {
     setLoading(true);
@@ -59,16 +80,42 @@ export function Customers() {
 
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <strong>{customers.length} cliente(s)</strong>
+          <strong>
+            {filteredCustomers.length} cliente(s){hasActiveFilters && customers.length !== filteredCustomers.length ? ` de ${customers.length}` : ''}
+          </strong>
           <button className="btn btn--accent" onClick={() => setFormOpen((v) => !v)}>
             {formOpen ? 'Cancelar' : '+ Novo cliente'}
           </button>
         </div>
 
+        {customers.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'flex-end', marginBottom: 16, paddingBottom: 16, borderBottom: '1px solid var(--rtv-line)' }}>
+            <div className="field" style={{ marginBottom: 0, flex: '1 1 240px' }}>
+              <label>Buscar</label>
+              <input type="text" placeholder="Nome, documento, e-mail ou telefone..." value={search} onChange={(e) => setSearch(e.target.value)} />
+            </div>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>Status</label>
+              <select value={activeFilter} onChange={(e) => setActiveFilter(e.target.value as typeof activeFilter)}>
+                <option value="all">Todos</option>
+                <option value="active">Ativo</option>
+                <option value="inactive">Inativo</option>
+              </select>
+            </div>
+            {hasActiveFilters && (
+              <button type="button" className="logout-btn" style={{ color: 'var(--ink-muted)', borderColor: 'var(--border)' }} onClick={clearFilters}>
+                Limpar filtros
+              </button>
+            )}
+          </div>
+        )}
+
         {loading ? (
           <p>Carregando...</p>
         ) : customers.length === 0 ? (
           <EmptyState title="Nenhum cliente cadastrado" body="Cadastre o primeiro cliente pra começar a criar contratos." />
+        ) : filteredCustomers.length === 0 ? (
+          <EmptyState title="Nenhum cliente encontrado" body="Nenhum cliente bate com os filtros aplicados." />
         ) : (
           <table>
             <thead>
@@ -81,7 +128,7 @@ export function Customers() {
               </tr>
             </thead>
             <tbody>
-              {customers.map((c) => (
+              {filteredCustomers.map((c) => (
                 <tr key={c.id}>
                   <td>{c.name}</td>
                   <td>

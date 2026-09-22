@@ -1,5 +1,6 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { api, ApiError } from '../api';
+import { EmptyState } from '../components/EmptyState';
 
 interface Vehicle {
   id: string;
@@ -34,6 +35,26 @@ export function Tracking() {
   const [formVehicle, setFormVehicle] = useState<Vehicle | null>(null);
   const [historyFor, setHistoryFor] = useState<Vehicle | null>(null);
   const [history, setHistory] = useState<Position[]>([]);
+
+  // Filtros
+  const [search, setSearch] = useState('');
+  const [onlyMissing, setOnlyMissing] = useState(false);
+
+  const filteredEntries = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return entries.filter((e) => {
+      if (onlyMissing && e.position) return false;
+      if (term && !`${e.vehicle.plate} ${e.vehicle.brand} ${e.vehicle.model}`.toLowerCase().includes(term)) return false;
+      return true;
+    });
+  }, [entries, search, onlyMissing]);
+
+  const hasActiveFilters = search.trim() !== '' || onlyMissing;
+
+  function clearFilters() {
+    setSearch('');
+    setOnlyMissing(false);
+  }
 
   async function load() {
     setLoading(true);
@@ -73,8 +94,31 @@ export function Tracking() {
       {error && <div className="error-banner">{error}</div>}
 
       <div className="card">
+        {entries.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'flex-end', marginBottom: 16, paddingBottom: 16, borderBottom: '1px solid var(--rtv-line)' }}>
+            <div className="field" style={{ marginBottom: 0, flex: '1 1 220px' }}>
+              <label>Buscar</label>
+              <input type="text" placeholder="Placa, marca ou modelo..." value={search} onChange={(e) => setSearch(e.target.value)} />
+            </div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, marginBottom: 10 }}>
+              <input type="checkbox" checked={onlyMissing} onChange={(e) => setOnlyMissing(e.target.checked)} />
+              Só sem registro
+            </label>
+            {hasActiveFilters && (
+              <button type="button" className="logout-btn" style={{ color: 'var(--ink-muted)', borderColor: 'var(--border)' }} onClick={clearFilters}>
+                Limpar filtros
+              </button>
+            )}
+          </div>
+        )}
+
         {loading ? (
           <p>Carregando...</p>
+        ) : filteredEntries.length === 0 ? (
+          <EmptyState
+            title={entries.length === 0 ? 'Nenhum veículo na frota' : 'Nenhum veículo encontrado'}
+            body={entries.length === 0 ? 'Cadastre veículos na Frota pra rastreá-los aqui.' : 'Nenhum veículo bate com os filtros aplicados.'}
+          />
         ) : (
           <table>
             <thead>
@@ -86,7 +130,7 @@ export function Tracking() {
               </tr>
             </thead>
             <tbody>
-              {entries.map((e) => (
+              {filteredEntries.map((e) => (
                 <tr key={e.vehicle.id}>
                   <td>
                     <span className="plate">{e.vehicle.plate}</span> {e.vehicle.brand} {e.vehicle.model}

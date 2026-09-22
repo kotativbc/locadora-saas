@@ -68,6 +68,12 @@ export function Login() {
         >
           Esqueci minha senha
         </Link>
+        <Link
+          to="/termos"
+          style={{ display: 'block', textAlign: 'center', marginTop: 10, fontSize: 11.5, color: 'var(--ink-muted)' }}
+        >
+          Termos de Uso e Prestação de Serviços
+        </Link>
       </form>
     </div>
   );

@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { api, ApiError } from '../api';
 import { EmptyState } from '../components/EmptyState';
@@ -40,6 +40,28 @@ export function Companies() {
   const activeCount = companies.filter((c) => c.status === 'active').length;
   const blockedCount = companies.filter((c) => ['suspended', 'cancelled', 'archived', 'security_blocked'].includes(c.status)).length;
 
+  // Filtros
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+
+  const statusesPresent = useMemo(() => Array.from(new Set(companies.map((c) => c.status))), [companies]);
+
+  const filteredCompanies = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return companies.filter((c) => {
+      if (statusFilter !== 'all' && c.status !== statusFilter) return false;
+      if (term && !`${c.name} ${c.tradeName ?? ''} ${c.cnpj ?? ''}`.toLowerCase().includes(term)) return false;
+      return true;
+    });
+  }, [companies, search, statusFilter]);
+
+  const hasActiveFilters = search.trim() !== '' || statusFilter !== 'all';
+
+  function clearFilters() {
+    setSearch('');
+    setStatusFilter('all');
+  }
+
   return (
     <div>
       <div className="page-header">
@@ -68,16 +90,45 @@ export function Companies() {
 
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <strong>{companies.length} empresa(s)</strong>
+          <strong>
+            {filteredCompanies.length} empresa(s){hasActiveFilters && companies.length !== filteredCompanies.length ? ` de ${companies.length}` : ''}
+          </strong>
           <button className="btn btn--accent" onClick={() => setFormOpen((v) => !v)}>
             {formOpen ? 'Cancelar' : '+ Nova empresa'}
           </button>
         </div>
 
+        {companies.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'flex-end', marginBottom: 16, paddingBottom: 16, borderBottom: '1px solid var(--rtv-line)' }}>
+            <div className="field" style={{ marginBottom: 0, flex: '1 1 220px' }}>
+              <label>Buscar</label>
+              <input type="text" placeholder="Nome ou CNPJ..." value={search} onChange={(e) => setSearch(e.target.value)} />
+            </div>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>Status</label>
+              <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                <option value="all">Todos</option>
+                {statusesPresent.map((s) => (
+                  <option key={s} value={s}>
+                    {COMPANY_STATUS_LABELS[s] ?? s}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {hasActiveFilters && (
+              <button type="button" className="logout-btn" style={{ color: 'var(--ink-muted)', borderColor: 'var(--border)' }} onClick={clearFilters}>
+                Limpar filtros
+              </button>
+            )}
+          </div>
+        )}
+
         {loading ? (
           <p>Carregando...</p>
         ) : companies.length === 0 ? (
           <EmptyState title="Nenhuma empresa cadastrada" body="Cadastre a primeira empresa locadora pra começar a usar a plataforma." />
+        ) : filteredCompanies.length === 0 ? (
+          <EmptyState title="Nenhuma empresa encontrada" body="Nenhuma empresa bate com os filtros aplicados." />
         ) : (
           <table>
             <thead>
@@ -90,7 +141,7 @@ export function Companies() {
               </tr>
             </thead>
             <tbody>
-              {companies.map((c) => (
+              {filteredCompanies.map((c) => (
                 <tr key={c.id}>
                   <td>
                     <Link to={`/empresas/${c.id}`} style={{ color: 'var(--rtv-navy-900)', fontWeight: 600, textDecoration: 'none' }}>

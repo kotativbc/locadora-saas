@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api, ApiError } from '../api';
 import { StatusSelect, type StatusOption } from '../components/StatusSelect';
@@ -71,6 +71,31 @@ export function Fleet() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [highlightId, vehicles]);
+
+  // Filtros
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+
+  const categories = useMemo(() => Array.from(new Set(vehicles.map((v) => v.category))).sort(), [vehicles]);
+
+  const filteredVehicles = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return vehicles.filter((v) => {
+      if (statusFilter !== 'all' && v.status !== statusFilter) return false;
+      if (categoryFilter !== 'all' && v.category !== categoryFilter) return false;
+      if (term && !`${v.plate} ${v.brand} ${v.model}`.toLowerCase().includes(term)) return false;
+      return true;
+    });
+  }, [vehicles, search, statusFilter, categoryFilter]);
+
+  const hasActiveFilters = search.trim() !== '' || statusFilter !== 'all' || categoryFilter !== 'all';
+
+  function clearFilters() {
+    setSearch('');
+    setStatusFilter('all');
+    setCategoryFilter('all');
+  }
 
   async function load() {
     setLoading(true);
@@ -193,16 +218,56 @@ export function Fleet() {
 
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <strong>{vehicles.length} veículo(s)</strong>
+          <strong>
+            {filteredVehicles.length} veículo(s){hasActiveFilters && vehicles.length !== filteredVehicles.length ? ` de ${vehicles.length}` : ''}
+          </strong>
           <button className="btn btn--accent" onClick={() => setFormOpen((v) => !v)}>
             {formOpen ? 'Cancelar' : '+ Novo veículo'}
           </button>
         </div>
 
+        {vehicles.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'flex-end', marginBottom: 16, paddingBottom: 16, borderBottom: '1px solid var(--rtv-line)' }}>
+            <div className="field" style={{ marginBottom: 0, flex: '1 1 220px' }}>
+              <label>Buscar</label>
+              <input type="text" placeholder="Placa, marca ou modelo..." value={search} onChange={(e) => setSearch(e.target.value)} />
+            </div>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>Status</label>
+              <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                <option value="all">Todos os status</option>
+                {STATUS_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>Categoria</label>
+              <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
+                <option value="all">Todas</option>
+                {categories.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {hasActiveFilters && (
+              <button type="button" className="logout-btn" style={{ color: 'var(--ink-muted)', borderColor: 'var(--border)' }} onClick={clearFilters}>
+                Limpar filtros
+              </button>
+            )}
+          </div>
+        )}
+
         {loading ? (
           <p>Carregando...</p>
         ) : vehicles.length === 0 ? (
           <EmptyState title="Nenhum veículo cadastrado" body="Cadastre o primeiro veículo pra começar a montar sua frota." />
+        ) : filteredVehicles.length === 0 ? (
+          <EmptyState title="Nenhum veículo encontrado" body="Nenhum veículo bate com os filtros aplicados." />
         ) : (
           <table>
             <thead>
@@ -216,7 +281,7 @@ export function Fleet() {
               </tr>
             </thead>
             <tbody>
-              {vehicles.map((v) => (
+              {filteredVehicles.map((v) => (
                 <tr
                   key={v.id}
                   ref={v.id === highlightId ? highlightedRowRef : undefined}

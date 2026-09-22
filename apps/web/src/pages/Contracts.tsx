@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api, ApiError, fetchFileUrl, copyToClipboard } from '../api';
 import { formatDateOnly } from '../dateUtils';
@@ -61,6 +61,12 @@ const STATUS_VARIANT: Record<string, BadgeVariant> = {
   cancelled: 'danger',
 };
 
+const TEMPLATE_LABELS: Record<string, string> = {
+  standard: 'Padrão',
+  monthly_app_driver: 'Motorista de app',
+  protected: 'Padrão com Proteção Total',
+};
+
 function formatCurrency(value: string) {
   return Number(value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
@@ -112,6 +118,37 @@ export function Contracts() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [highlightId, contracts]);
+
+  // Filtros
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [templateFilter, setTemplateFilter] = useState('all');
+  const [periodFrom, setPeriodFrom] = useState('');
+  const [periodTo, setPeriodTo] = useState('');
+
+  const filteredContracts = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return contracts.filter((c) => {
+      if (statusFilter !== 'all' && c.status !== statusFilter) return false;
+      if (templateFilter !== 'all' && c.templateType !== templateFilter) return false;
+      if (term && !`${c.customer.name} ${c.customer.document} ${c.vehicle.plate} ${c.vehicle.brand} ${c.vehicle.model}`.toLowerCase().includes(term))
+        return false;
+      if (periodFrom && c.endDate.slice(0, 10) < periodFrom) return false;
+      if (periodTo && c.startDate.slice(0, 10) > periodTo) return false;
+      return true;
+    });
+  }, [contracts, search, statusFilter, templateFilter, periodFrom, periodTo]);
+
+  const hasActiveFilters =
+    search.trim() !== '' || statusFilter !== 'all' || templateFilter !== 'all' || periodFrom !== '' || periodTo !== '';
+
+  function clearFilters() {
+    setSearch('');
+    setStatusFilter('all');
+    setTemplateFilter('all');
+    setPeriodFrom('');
+    setPeriodTo('');
+  }
 
   async function load() {
     setLoading(true);
@@ -323,16 +360,64 @@ export function Contracts() {
 
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <strong>{contracts.length} contrato(s)</strong>
+          <strong>
+            {filteredContracts.length} contrato(s){hasActiveFilters && contracts.length !== filteredContracts.length ? ` de ${contracts.length}` : ''}
+          </strong>
           <button className="btn btn--accent" onClick={() => setFormOpen((v) => !v)}>
             {formOpen ? 'Cancelar' : '+ Novo contrato'}
           </button>
         </div>
 
+        {contracts.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'flex-end', marginBottom: 16, paddingBottom: 16, borderBottom: '1px solid var(--rtv-line)' }}>
+            <div className="field" style={{ marginBottom: 0, flex: '1 1 220px' }}>
+              <label>Buscar</label>
+              <input type="text" placeholder="Cliente, documento ou placa..." value={search} onChange={(e) => setSearch(e.target.value)} />
+            </div>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>Status</label>
+              <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                <option value="all">Todos os status</option>
+                {Object.entries(STATUS_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>Modalidade</label>
+              <select value={templateFilter} onChange={(e) => setTemplateFilter(e.target.value)}>
+                <option value="all">Todas</option>
+                {Object.entries(TEMPLATE_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>Período de</label>
+              <input type="date" value={periodFrom} onChange={(e) => setPeriodFrom(e.target.value)} />
+            </div>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>até</label>
+              <input type="date" value={periodTo} onChange={(e) => setPeriodTo(e.target.value)} />
+            </div>
+            {hasActiveFilters && (
+              <button type="button" className="logout-btn" style={{ color: 'var(--ink-muted)', borderColor: 'var(--border)' }} onClick={clearFilters}>
+                Limpar filtros
+              </button>
+            )}
+          </div>
+        )}
+
         {loading ? (
           <p>Carregando...</p>
         ) : contracts.length === 0 ? (
           <EmptyState title="Nenhum contrato ainda" body="Crie um contrato depois de cadastrar cliente, veículo e tarifa." />
+        ) : filteredContracts.length === 0 ? (
+          <EmptyState title="Nenhum contrato encontrado" body="Nenhum contrato bate com os filtros aplicados." />
         ) : (
           <table>
             <thead>
@@ -348,7 +433,7 @@ export function Contracts() {
               </tr>
             </thead>
             <tbody>
-              {contracts.map((c) => (
+              {filteredContracts.map((c) => (
                 <tr
                   key={c.id}
                   ref={c.id === highlightId ? highlightedRowRef : undefined}
