@@ -154,7 +154,7 @@ export class VehiclesService {
         _sum: { amount: true },
       }),
       this.prisma.charge.aggregate({
-        where: { status: 'pending', contract: { vehicleId: id } },
+        where: { status: { in: ['pending', 'atrasado'] }, contract: { vehicleId: id } },
         _sum: { amount: true },
       }),
       this.prisma.expense.aggregate({
@@ -211,7 +211,7 @@ export class VehiclesService {
       this.prisma.charge.aggregate({
         where: {
           companyId: actor.companyId,
-          status: 'pending',
+          status: { in: ['pending', 'atrasado'] },
           OR: [{ contractId: null }, { contract: { vehicle: { status: { not: 'sold' } } } }],
         },
         _sum: { amount: true },
